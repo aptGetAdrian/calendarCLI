@@ -12,6 +12,10 @@ import (
 	"google.golang.org/api/calendar/v3"
 )
 
+func returnTimezoneString() string {
+	return time.Now().Location().String()
+}
+
 func listEvents(srv *calendar.Service, max int) {
 	t := time.Now().Format(time.RFC3339)
 
@@ -49,6 +53,64 @@ func listEvents(srv *calendar.Service, max int) {
 
 }
 
+func insertEvent(srv *calendar.Service) {
+	// TODO: make pretty
+	// t := time.Now().Format(time.RFC3339)
+
+	// TODO: make sure to automate the timezone offset thing
+	var title, location, description string
+
+	fmt.Println("Write a title for the event:")
+	if _, err := fmt.Scan(&title); err != nil {
+		log.Fatalf("Unable to read the title")
+	}
+
+	for len(title) == 0 {
+		fmt.Println("Title cannot be empty:")
+		if _, err := fmt.Scan(&title); err != nil {
+			log.Fatalf("Unable to read the title")
+		}
+	}
+
+	fmt.Println("Write a location for the event:")
+	if _, err := fmt.Scan(&location); err != nil {
+		log.Fatalf("Unable to read the location!")
+	}
+
+	fmt.Println("Write a description for the event:")
+	if _, err := fmt.Scan(&description); err != nil {
+		log.Fatalf("Unable to read the description!")
+	}
+
+	timezone := returnTimezoneString()
+
+	event := &calendar.Event{
+		Summary:     title,
+		Location:    location,
+		Description: description,
+		Start: &calendar.EventDateTime{
+			DateTime: "2026-02-09T16:00:00+01:00",
+			TimeZone: timezone,
+		},
+		End: &calendar.EventDateTime{
+			DateTime: "2026-02-09T17:00:00+01:00",
+			TimeZone: timezone,
+		},
+		Recurrence: []string{"RRULE:FREQ=DAILY;COUNT=2"},
+		Attendees: []*calendar.EventAttendee{
+			&calendar.EventAttendee{Email: "lpage@example.com"},
+			&calendar.EventAttendee{Email: "sbrin@example.com"},
+		},
+	}
+
+	event, err := srv.Events.Insert("primary", event).Do()
+	if err != nil {
+		log.Fatalf("Unable to create event. %v\n", err)
+	}
+	fmt.Printf("Event created: %s\n", event.HtmlLink)
+
+}
+
 // eventsCmd represents the events command
 var eventsCmd = &cobra.Command{
 	Use:   "events",
@@ -57,14 +119,13 @@ var eventsCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		list, _ := cmd.Flags().GetBool("list")
 		create, _ := cmd.Flags().GetBool("create")
-
+		srv := EnsureConnected()
 		if list {
-			srv := EnsureConnected()
 			listEvents(srv, 7)
 		}
 
 		if create {
-			fmt.Print("creating event")
+			insertEvent(srv)
 		}
 	},
 }
