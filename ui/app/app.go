@@ -42,17 +42,19 @@ func New(service *calendar.Service) tea.Model {
 	}
 
 	l := styles.BuildList("Main menu", items, ui.MainMenu)
-	l.SetStatusBarItemName("calndar", "calendars")
-	l.StatusMessageLifetime = 0
+
+	l.SetShowStatusBar(false)
 
 	appState := setAppState(service)
 
-	return model{
+	model := model{
 		service:  service,
 		list:     l,
 		docStyle: styles.DocStyle,
 		state:    appState,
 	}
+
+	return model
 }
 
 func (m model) Init() tea.Cmd {
@@ -63,7 +65,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		h, v := m.docStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v)
+		statusBarHeight := lipgloss.Height(m.buildStatusBar())
+
+		listHeight := msg.Height - v - statusBarHeight
+		m.list.SetSize(msg.Width-h, listHeight)
+
 		return m, nil
 
 	case tea.KeyMsg:
@@ -76,6 +82,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch selectedItem.title {
 				case "Exit":
 					return m, tea.Quit
+				case "Choose calendar":
+
+					// selected := m.service.SelectCalendar("Work") // hypothetical
+					// m.state.SelectedCalendar = selected.Name
+
+					// TODO: at the bottom line to the "Create calendar" option
+					// m.state.CalendarCount = len(m.service.Calendars)
+
 				}
 
 				// TODO: add other items
@@ -85,11 +99,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
-	m.updateMainMenuStatus()
 
 	return m, cmd
 }
 
 func (m model) View() string {
-	return m.docStyle.Render(m.list.View())
+	return m.docStyle.Render(
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			m.list.View(),
+			m.buildStatusBar(),
+		),
+	)
 }
