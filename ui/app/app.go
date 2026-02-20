@@ -3,6 +3,8 @@ package app
 import (
 	calendar "calendarCli/internal"
 	"calendarCli/ui"
+	"fmt"
+	"os"
 
 	"calendarCli/ui/styles"
 
@@ -38,11 +40,17 @@ func (i item) ActionValue() string { return i.Action }
 func (i item) FilterValue() string { return i.TitleValue }
 
 func New(service *calendar.Service) tea.Model {
-	items := []list.Item{
-		item{TitleValue: "Select calendar", Desc: "Choose a calendar from your Google calendars.\nThe default one is the primary calendar.", Action: "SELECT_CALENDAR"},
-		item{TitleValue: "List events", Desc: "List all events in your chosen calendar.", Action: "LIST_EVENTS"},
-		item{TitleValue: "Create event", Desc: "Create a new event for your chosen calendar.", Action: "CREATE_EVENT"},
-		item{TitleValue: "Exit", Desc: "Close the application", Action: "EXIT_APP"},
+	// items := []list.Item{
+	// 	item{TitleValue: "Select calendar", Desc: "Choose a calendar from your Google calendars.\nThe default one is the primary calendar.", Action: "SELECT_CALENDAR"},
+	// 	item{TitleValue: "List events", Desc: "List all events in your chosen calendar.", Action: "LIST_EVENTS"},
+	// 	item{TitleValue: "Create event", Desc: "Create a new event for your chosen calendar.", Action: "CREATE_EVENT"},
+	// 	item{TitleValue: "Exit", Desc: "Close the application", Action: "EXIT_APP"},
+	// }
+
+	items, err := loadMenuItems("main_menu_items")
+	if err != nil {
+		fmt.Println("Error running program:", err)
+		os.Exit(1)
 	}
 
 	l := styles.BuildList("Main menu", items, ui.MainMenu)
