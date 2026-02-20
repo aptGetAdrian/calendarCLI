@@ -12,9 +12,9 @@ import (
 )
 
 type item struct {
-	Title  string `json:"title"`
-	Desc   string `json:"description"`
-	Action string `json:"action"`
+	TitleValue string `json:"title"`
+	Desc       string `json:"description"`
+	Action     string `json:"action"`
 }
 
 type AppState struct {
@@ -22,6 +22,7 @@ type AppState struct {
 	CalendarCount    int
 	EventCount       int
 	SelectedCalendar string
+	SelectedMenuItem string
 }
 
 type model struct {
@@ -31,17 +32,17 @@ type model struct {
 	state    AppState
 }
 
-func (i item) TitleValue() string  { return i.Title }
+func (i item) Title() string       { return i.TitleValue }
 func (i item) Description() string { return i.Desc }
 func (i item) ActionValue() string { return i.Action }
-func (i item) FilterValue() string { return i.Title }
+func (i item) FilterValue() string { return i.TitleValue }
 
 func New(service *calendar.Service) tea.Model {
 	items := []list.Item{
-		item{Title: "Choose calendar", Desc: "Choose a calendar from your Google calendars.\nThe default one is the primary calendar.", Action: "SELECT_CALENDAR"},
-		item{Title: "List events", Desc: "List all events in your chosen calendar.", Action: "LIST_EVENTS"},
-		item{Title: "Create event", Desc: "Create a new event for your chosen calendar.", Action: "CREATE_EVENT"},
-		item{Title: "Exit", Desc: "Close the application", Action: "EXIT_APP"},
+		item{TitleValue: "Select calendar", Desc: "Choose a calendar from your Google calendars.\nThe default one is the primary calendar.", Action: "SELECT_CALENDAR"},
+		item{TitleValue: "List events", Desc: "List all events in your chosen calendar.", Action: "LIST_EVENTS"},
+		item{TitleValue: "Create event", Desc: "Create a new event for your chosen calendar.", Action: "CREATE_EVENT"},
+		item{TitleValue: "Exit", Desc: "Close the application", Action: "EXIT_APP"},
 	}
 
 	l := styles.BuildList("Main menu", items, ui.MainMenu)
@@ -79,13 +80,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "up", "down", "k", "j":
+			var cmd tea.Cmd
+			m.list, cmd = m.list.Update(msg)
+
+			selectedItem, ok := m.list.SelectedItem().(item)
+			if ok {
+				m.updateSelectedMenuItem(selectedItem.TitleValue)
+			}
+
+			return m, cmd
 		case "enter":
 			selectedItem, ok := m.list.SelectedItem().(item)
 			if ok {
 				switch selectedItem.Action {
 				case "EXIT_APP":
+					m.updateSelectedMenuItem("Exit")
 					return m, tea.Quit
 				case "SELECT_CALENDAR":
+					m.updateSelectedMenuItem("Select calendar")
 
 					// selected := m.service.SelectCalendar("Work") // hypothetical
 					// m.state.SelectedCalendar = selected.Name
@@ -93,7 +106,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// TODO: at the bottom line to the "Create calendar" option
 					// m.state.CalendarCount = len(m.service.Calendars)
 				case "LIST_EVENTS":
-				case "CCREATE_EVENT":
+					m.updateSelectedMenuItem("List events")
+				case "CREATE_EVENT":
+					m.updateSelectedMenuItem("Create event")
 				}
 
 				// TODO: add other items
