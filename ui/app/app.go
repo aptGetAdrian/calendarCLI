@@ -12,7 +12,9 @@ import (
 )
 
 type item struct {
-	title, desc string
+	Title  string `json:"title"`
+	Desc   string `json:"description"`
+	Action string `json:"action"`
 }
 
 type AppState struct {
@@ -29,16 +31,17 @@ type model struct {
 	state    AppState
 }
 
-func (i item) Title() string       { return i.title }
-func (i item) Description() string { return i.desc }
-func (i item) FilterValue() string { return i.title }
+func (i item) TitleValue() string  { return i.Title }
+func (i item) Description() string { return i.Desc }
+func (i item) ActionValue() string { return i.Action }
+func (i item) FilterValue() string { return i.Title }
 
 func New(service *calendar.Service) tea.Model {
 	items := []list.Item{
-		item{title: "Choose calendar", desc: "Choose a calendar from your Google calendars.\nThe default one is the primary calendar."},
-		item{title: "List events", desc: "List all events in your chosen calendar."},
-		item{title: "Create event", desc: "Create a new event for your chosen calendar."},
-		item{title: "Exit", desc: "Close the application"},
+		item{Title: "Choose calendar", Desc: "Choose a calendar from your Google calendars.\nThe default one is the primary calendar.", Action: "SELECT_CALENDAR"},
+		item{Title: "List events", Desc: "List all events in your chosen calendar.", Action: "LIST_EVENTS"},
+		item{Title: "Create event", Desc: "Create a new event for your chosen calendar.", Action: "CREATE_EVENT"},
+		item{Title: "Exit", Desc: "Close the application", Action: "EXIT_APP"},
 	}
 
 	l := styles.BuildList("Main menu", items, ui.MainMenu)
@@ -79,17 +82,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			selectedItem, ok := m.list.SelectedItem().(item)
 			if ok {
-				switch selectedItem.title {
-				case "Exit":
+				switch selectedItem.Action {
+				case "EXIT_APP":
 					return m, tea.Quit
-				case "Choose calendar":
+				case "SELECT_CALENDAR":
 
 					// selected := m.service.SelectCalendar("Work") // hypothetical
 					// m.state.SelectedCalendar = selected.Name
 
 					// TODO: at the bottom line to the "Create calendar" option
 					// m.state.CalendarCount = len(m.service.Calendars)
-
+				case "LIST_EVENTS":
+				case "CCREATE_EVENT":
 				}
 
 				// TODO: add other items
