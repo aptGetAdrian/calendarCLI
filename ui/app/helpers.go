@@ -12,7 +12,13 @@ import (
 
 func BuildList(title string, items []list.Item, menu ui.Menu) list.Model {
 
-	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
+	delegate := list.NewDefaultDelegate()
+	delegate.Styles.NormalTitle = styles.ListItemTitle
+	delegate.Styles.NormalDesc = styles.ListItemDesc
+	delegate.Styles.SelectedTitle = styles.SelectedListItemTitle
+	delegate.Styles.SelectedDesc = styles.SelectedListItemDesc
+
+	l := list.New(items, delegate, 0, 0)
 
 	l.Title = title
 
