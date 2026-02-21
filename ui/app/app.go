@@ -6,18 +6,13 @@ import (
 	"fmt"
 	"os"
 
+	"calendarCli/ui/models"
 	"calendarCli/ui/styles"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
-
-type item struct {
-	TitleValue string `json:"title"`
-	Desc       string `json:"description"`
-	Action     string `json:"action"`
-}
 
 type AppState struct {
 	IsAuthenticated  bool
@@ -34,20 +29,8 @@ type model struct {
 	state    AppState
 }
 
-func (i item) Title() string       { return i.TitleValue }
-func (i item) Description() string { return i.Desc }
-func (i item) ActionValue() string { return i.Action }
-func (i item) FilterValue() string { return i.TitleValue }
-
 func New(service *calendar.Service) tea.Model {
-	// items := []list.Item{
-	// 	item{TitleValue: "Select calendar", Desc: "Choose a calendar from your Google calendars.\nThe default one is the primary calendar.", Action: "SELECT_CALENDAR"},
-	// 	item{TitleValue: "List events", Desc: "List all events in your chosen calendar.", Action: "LIST_EVENTS"},
-	// 	item{TitleValue: "Create event", Desc: "Create a new event for your chosen calendar.", Action: "CREATE_EVENT"},
-	// 	item{TitleValue: "Exit", Desc: "Close the application", Action: "EXIT_APP"},
-	// }
-
-	items, err := loadMenuItems("main_menu_items")
+	items, err := ui.LoadMenuItems("main_menu_items")
 	if err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
@@ -92,14 +75,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.list, cmd = m.list.Update(msg)
 
-			selectedItem, ok := m.list.SelectedItem().(item)
+			selectedItem, ok := m.list.SelectedItem().(models.MenuItem)
 			if ok {
 				m.updateSelectedMenuItem(selectedItem.TitleValue)
 			}
 
 			return m, cmd
 		case "enter":
-			selectedItem, ok := m.list.SelectedItem().(item)
+			selectedItem, ok := m.list.SelectedItem().(models.MenuItem)
 			if ok {
 				switch selectedItem.Action {
 				case "EXIT_APP":

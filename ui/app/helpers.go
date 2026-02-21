@@ -2,12 +2,8 @@ package app
 
 import (
 	calendar "calendarCli/internal"
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 
-	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -53,45 +49,4 @@ func setAppState(service *calendar.Service) AppState {
 			SelectedMenuItem: "\"Select calendar\"",
 		}
 	}
-}
-
-func loadMenuItems(menuType string) ([]list.Item, error) {
-	configPath := filepath.Join("ui", "menu.json")
-
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
-
-	var config map[string]json.RawMessage
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, err
-	}
-
-	menuData, ok := config[menuType]
-	if !ok {
-		return nil, fmt.Errorf("menu type '%s' not found in config", menuType)
-	}
-
-	// Parse the specific menu items
-	var menuItems []struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		Action      string `json:"action"`
-	}
-
-	if err := json.Unmarshal(menuData, &menuItems); err != nil {
-		return nil, err
-	}
-
-	items := make([]list.Item, len(menuItems))
-	for i, menuItem := range menuItems {
-		items[i] = item{
-			TitleValue: menuItem.Title,
-			Desc:       menuItem.Description,
-			Action:     menuItem.Action,
-		}
-	}
-
-	return items, nil
 }
