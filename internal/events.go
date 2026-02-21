@@ -43,5 +43,5 @@ func (s *Service) CreateEvent(
 		},
 	}
 
-	return s.insert(event)
+	return s.Insert(event)
 }

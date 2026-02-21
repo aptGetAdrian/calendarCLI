@@ -39,6 +39,52 @@ func NewService() (*Service, error) {
 	return &Service{client: srv}, nil
 }
 
-func (s *Service) insert(event *gcalendar.Event) (*gcalendar.Event, error) {
+func (s *Service) Insert(event *gcalendar.Event) (*gcalendar.Event, error) {
 	return s.client.Events.Insert("primary", event).Do()
+}
+
+func (s *Service) GetNumCalendars() (int, error) {
+	// we check for the user calendars
+	calendarList, err := s.client.CalendarList.List().Do()
+	if err != nil {
+		return 0, err
+	}
+	count := len(calendarList.Items)
+
+	// we check if "birthdays" exist (they do for most users)
+	birthdayEvents, err := s.client.Events.List("primary").
+		EventTypes("birthday").
+		MaxResults(1).
+		Do()
+
+	if err != nil {
+		return count, err
+	}
+
+	if len(birthdayEvents.Items) > 0 {
+		count++
+	}
+
+	// TODO
+	// the "Tasks" "calendar "is a whole separate API
+	// would need to check google Tasks API
+
+	return count, nil
+}
+
+func (s *Service) GetPrimaryCalendar() (string, error) {
+	calendar, err := s.client.CalendarList.Get("primary").Do()
+
+	if err != nil {
+		return "", err
+	}
+
+	// jsonData, err := json.MarshalIndent(calendar, "", "  ")
+	// if err != nil {
+	// 	fmt.Println("Error marshaling JSON:", err)
+	// } else {
+	// 	fmt.Println(string(jsonData))
+	// }
+
+	return calendar.Summary, nil
 }

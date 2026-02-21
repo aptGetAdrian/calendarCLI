@@ -1,13 +1,32 @@
 package styles
 
 import (
-	"calendarCli/ui"
-
-	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/lipgloss"
 )
 
 var DocStyle = lipgloss.NewStyle().Margin(1, 2)
+
+// Color palette
+const (
+	ColorSuccess = "10"  // Green
+	ColorInfo    = "12"  // Blue
+	ColorWarning = "14"  // Cyan
+	ColorAccent  = "86"  // Bright cyan/mint
+	ColorBorder  = "240" // Gray
+	ColorError   = "9"   // Red
+)
+
+var (
+	SuccessText = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSuccess))
+	InfoText    = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorInfo))
+	WarningText = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
+	AccentText  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorAccent))
+
+	StatusBarBorder = lipgloss.NewStyle().
+			BorderTop(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color(ColorBorder))
+)
 
 func MainMenuTtitle() lipgloss.Style {
 	return lipgloss.NewStyle().
@@ -27,20 +46,4 @@ func SecondaryMenuTtitle() lipgloss.Style {
 		Bold(true).
 		Foreground(lipgloss.Color("#caa1a1")).
 		Background(lipgloss.Color("#9079d4"))
-}
-
-func BuildList(title string, items []list.Item, menu ui.Menu) list.Model {
-
-	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
-
-	l.Title = title
-
-	switch menu {
-	case ui.MainMenu:
-		l.Styles.Title = MainMenuTtitle()
-	case ui.SecondaryMenu:
-		l.Styles.Title = SecondaryMenuTtitle()
-	}
-
-	return l
 }

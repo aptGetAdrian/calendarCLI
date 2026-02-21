@@ -36,7 +36,7 @@ func New(service *calendar.Service) tea.Model {
 		os.Exit(1)
 	}
 
-	l := styles.BuildList("Main menu", items, ui.MainMenu)
+	l := BuildList("Main menu", items, ui.MainMenu)
 
 	l.SetShowStatusBar(false)
 
