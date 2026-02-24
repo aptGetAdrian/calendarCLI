@@ -68,7 +68,6 @@ func SecondaryMenuTtitle() lipgloss.Style {
 }
 
 var (
-	// Normal list item
 	ListItemTitle = lipgloss.NewStyle().
 			PaddingLeft(2).
 			Foreground(lipgloss.Color(ColorInfo))
@@ -86,5 +85,5 @@ var (
 				BorderStyle(lipgloss.NormalBorder()).
 				BorderForeground(lipgloss.Color(ColorAccent))
 
-	SelectedListItemDesc = SelectedListItemTitle.Copy() // Same style or customize differently
+	SelectedListItemDesc = SelectedListItemTitle
 )

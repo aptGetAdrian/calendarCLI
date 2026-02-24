@@ -32,27 +32,27 @@ func BuildList(title string, items []list.Item, menu ui.Menu) list.Model {
 	return l
 }
 
-func (m *model) buildStatusLine() string {
+func buildStatusLine(state *AppState) string {
 	calCount := ""
 	authText := styles.SuccessText.Render("Authenticated ✓")
 
-	if m.state.CalendarCount == 1 {
-		calCount = styles.InfoText.Render(fmt.Sprintf("%d calendar", m.state.CalendarCount))
+	if state.CalendarCount == 1 {
+		calCount = styles.InfoText.Render(fmt.Sprintf("%d calendar", state.CalendarCount))
 	} else {
-		calCount = styles.InfoText.Render(fmt.Sprintf("%d calendars", m.state.CalendarCount))
+		calCount = styles.InfoText.Render(fmt.Sprintf("%d calendars", state.CalendarCount))
 	}
 
-	selected := styles.WarningText.Render("Selected: " + m.state.SelectedCalendar)
-	selectedItem := styles.AccentText.Render("Selected menu item: " + m.state.SelectedMenuItem)
+	selected := styles.WarningText.Render("Selected: " + state.SelectedCalendar)
+	selectedItem := styles.AccentText.Render("Selected menu item: " + state.SelectedMenuItem)
 
 	return fmt.Sprintf("%s • %s • %s • %s", authText, calCount, selected, selectedItem)
 }
 
-func (m *model) buildStatusBar() string {
-	statusLine := m.buildStatusLine()
+func buildStatusBar(state *AppState, width int) string {
+	statusLine := buildStatusLine(state)
 
 	return styles.StatusBarBorder.
-		Width(m.list.Width()).
+		Width(width).
 		Render(statusLine)
 }
 

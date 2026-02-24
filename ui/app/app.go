@@ -23,10 +23,12 @@ type AppState struct {
 }
 
 type model struct {
-	service  *calendar.Service
-	list     list.Model
-	docStyle lipgloss.Style
-	state    AppState
+	service    *calendar.Service
+	list       list.Model
+	docStyle   lipgloss.Style
+	state      AppState
+	termWidth  int
+	termHeight int
 }
 
 func New(service *calendar.Service) tea.Model {
@@ -53,18 +55,20 @@ func New(service *calendar.Service) tea.Model {
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	return tea.WindowSize()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.termWidth = msg.Width
+		m.termHeight = msg.Height
 		h, v := m.docStyle.GetFrameSize()
-		statusBarHeight := lipgloss.Height(m.buildStatusBar())
-
+		statusBarHeight := lipgloss.Height(buildStatusBar(&m.state, msg.Width))
+		listWidth := msg.Width - h
 		listHeight := msg.Height - v - statusBarHeight
-		m.list.SetSize(msg.Width-h, listHeight)
 
+		m.list.SetSize(listWidth, listHeight)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -90,7 +94,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Quit
 				case "SELECT_CALENDAR":
 					m.updateSelectedMenuItem("Select calendar")
-
+					newModel := NewSelectCalendarModel(m.service, m.termWidth, m.termHeight)
+					return newModel, newModel.Init()
 					// selected := m.service.SelectCalendar("Work") // hypothetical
 					// m.state.SelectedCalendar = selected.Name
 
@@ -118,7 +123,7 @@ func (m model) View() string {
 		lipgloss.JoinVertical(
 			lipgloss.Left,
 			m.list.View(),
-			m.buildStatusBar(),
+			buildStatusBar(&m.state, m.list.Width()),
 		),
 	)
 }

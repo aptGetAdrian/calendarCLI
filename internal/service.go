@@ -88,3 +88,23 @@ func (s *Service) GetPrimaryCalendar() (string, error) {
 
 	return calendar.Summary, nil
 }
+
+func (s *Service) SelectCalendar(name string) (string, error) {
+	calendar, err := s.client.CalendarList.Get(name).Do()
+
+	if err != nil {
+		return "", err
+	}
+
+	return calendar.Summary, nil
+}
+
+func (s *Service) GetAllCalendars() (*gcalendar.CalendarList, error) {
+	calendars, err := s.client.CalendarList.List().Do()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return calendars, nil
+}
