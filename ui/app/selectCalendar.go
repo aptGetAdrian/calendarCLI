@@ -34,6 +34,19 @@ func NewSelectCalendarModel(service *calendar.Service, width, height int) tea.Mo
 		}
 	}
 
+	if birthdayEvents, err := service.ExistBirthday(); err != nil {
+		fmt.Println("Error checking if \"birthdays\" exist:", err)
+	} else {
+		if birthdayEvents {
+			temp := models.MenuItem{
+				TitleValue: "Birthdays",
+				Desc:       "Displays birthdays, anniversaries and other significant dates",
+				Action:     "CHOOSE_CALENDAR",
+			}
+			items = append(items, temp)
+		}
+	}
+
 	l := BuildList("Select Calendar", items, ui.MainMenu)
 	l.SetShowStatusBar(false)
 
@@ -80,17 +93,26 @@ func (m *selectCalendarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "enter":
 			selected, ok := m.list.SelectedItem().(models.MenuItem)
-			if ok {
+			if !ok {
+				return m, nil // or handle invalid selection appropriately
+			}
+
+			if selected.TitleValue == "Birthdays" {
+				m.state.SelectedCalendar = "Birthdays"
+				// fmt.Printf("Birthdays was selected")
+			} else {
 				selectedCalendar, err := m.service.SelectCalendar(selected.TitleValue)
 				if err != nil {
+					// TODO: add a prompt that the calendar wasn't retrieved
 					fmt.Printf("Couldn't retrieve calendar name: %s\n", err)
+					return m, nil // stay on current screen if error
 				}
 				m.state.SelectedCalendar = selectedCalendar
-				// go back to main menu
-				newModel := New(m.service)
-				return newModel, newModel.Init()
-				// TODO: next up, add the option to also choose the birthdays "calendar"
 			}
+
+			// go back to main menu
+			newModel := New(m.service)
+			return newModel, newModel.Init()
 		}
 	}
 

@@ -96,6 +96,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.updateSelectedMenuItem("Select calendar")
 					newModel := NewSelectCalendarModel(m.service, m.termWidth, m.termHeight)
 					return newModel, newModel.Init()
+					
 					// selected := m.service.SelectCalendar("Work") // hypothetical
 					// m.state.SelectedCalendar = selected.Name
 

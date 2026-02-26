@@ -60,6 +60,10 @@ func (m *model) updateSelectedMenuItem(name string) {
 	m.state.SelectedMenuItem = fmt.Sprintf("\"%s\"", name)
 }
 
+func (m *model) updateSelectedCalendar(name string) {
+	m.state.SelectedMenuItem = fmt.Sprintf("\"%s\"", name)
+}
+
 func setAppState(service *calendar.Service) AppState {
 	calendarCount, err := service.GetNumCalendars()
 	if err != nil {

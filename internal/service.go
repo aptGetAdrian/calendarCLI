@@ -108,3 +108,21 @@ func (s *Service) GetAllCalendars() (*gcalendar.CalendarList, error) {
 
 	return calendars, nil
 }
+
+func (s *Service) ExistBirthday() (bool, error) {
+	birthdayEvents, err := s.client.Events.List("primary").
+		EventTypes("birthday").
+		MaxResults(1).
+		Do()
+
+	if err != nil {
+		return false, err
+	}
+
+	if len(birthdayEvents.Items) > 0 {
+		return true, nil
+	}
+
+	return false, nil
+
+}
