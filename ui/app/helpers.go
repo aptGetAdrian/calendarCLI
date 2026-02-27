@@ -8,6 +8,8 @@ import (
 	"log"
 
 	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func BuildList(title string, items []list.Item, menu ui.Menu) list.Model {
@@ -56,13 +58,12 @@ func buildStatusBar(state *AppState, width int) string {
 		Render(statusLine)
 }
 
-func (m *model) updateSelectedMenuItem(name string) {
-	m.state.SelectedMenuItem = fmt.Sprintf("\"%s\"", name)
-}
-
-func (m *model) updateSelectedCalendar(name string) {
-	m.state.SelectedMenuItem = fmt.Sprintf("\"%s\"", name)
-}
+// func (m *model) updateSelectedMenuItem(name string) {
+// 	m.state.SelectedMenuItem = fmt.Sprintf("\"%s\"", name)
+// }
+// func (m *model) updateSelectedCalendar(name string) {
+// 	m.state.SelectedMenuItem = fmt.Sprintf("\"%s\"", name)
+// }
 
 func setAppState(service *calendar.Service) AppState {
 	calendarCount, err := service.GetNumCalendars()
@@ -94,4 +95,33 @@ func setAppState(service *calendar.Service) AppState {
 			SelectedMenuItem: "\"Select calendar\"",
 		}
 	}
+}
+
+func (m *RootModel) contentWidth() int {
+	h, _ := m.docStyle.GetFrameSize()
+	return m.termWidth - h
+}
+
+func (m *RootModel) contentHeight() int {
+	_, v := m.docStyle.GetFrameSize()
+	statusBarHeight := lipgloss.Height(buildStatusBar(&m.state, m.contentWidth()))
+	return m.termHeight - v - statusBarHeight
+}
+
+func (m *RootModel) handleNavigation(msg NavigateTo) (tea.Model, tea.Cmd) {
+	switch ui.Screen(msg.Screen) {
+	case ui.SelectCalendarScreen:
+		child := newSelectCalendarModel(m.service, m.state, m.contentWidth(), m.contentHeight())
+		m.activeScreen = screenSelectCalendar
+		m.child = child
+		return m, child.Init()
+	case ui.MainMenuScreen:
+		child := newMainMenuModel(m.state)
+		m.activeScreen = screenMainMenu
+		m.child = child
+		sized, sizeCmd := child.Update(sizedMsg{width: m.contentWidth(), height: m.contentHeight()})
+		m.child = sized
+		return m, tea.Batch(child.Init(), sizeCmd)
+	}
+	return m, nil
 }
