@@ -26,20 +26,16 @@ func (s *Service) ListUpcoming(max int) ([]*gcalendar.Event, error) {
 
 func (s *Service) CreateEvent(
 	calendarID, title, location, description string,
-	start, end time.Time,
-	timezone string,
-) (*gcalendar.Event, error) {
+	start, end time.Time) (*gcalendar.Event, error) {
 	event := &gcalendar.Event{
 		Summary:     title,
 		Location:    location,
 		Description: description,
 		Start: &gcalendar.EventDateTime{
 			DateTime: start.Format(time.RFC3339),
-			TimeZone: timezone,
 		},
 		End: &gcalendar.EventDateTime{
 			DateTime: end.Format(time.RFC3339),
-			TimeZone: timezone,
 		},
 	}
 	return s.Insert(calendarID, event)
