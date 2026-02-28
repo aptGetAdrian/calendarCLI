@@ -15,14 +15,14 @@ type mainMenuModel struct {
 	list  list.Model
 }
 
-func newMainMenuModel(state AppState) *mainMenuModel {
+func newMainMenuModel(state AppState, width, height int) *mainMenuModel {
 	items, err := ui.LoadMenuItems("main_menu_items")
 	if err != nil {
 		fmt.Println("Error loading menu items:", err)
 		os.Exit(1)
 	}
 
-	l := BuildList("Main menu", items, ui.MainMenu)
+	l := BuildList("Main menu", items, ui.MainMenu, width, height)
 	l.SetShowStatusBar(false)
 
 	return &mainMenuModel{

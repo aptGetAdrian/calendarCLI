@@ -39,8 +39,8 @@ func NewService() (*Service, error) {
 	return &Service{client: srv}, nil
 }
 
-func (s *Service) Insert(event *gcalendar.Event) (*gcalendar.Event, error) {
-	return s.client.Events.Insert("primary", event).Do()
+func (s *Service) Insert(calendarId string, event *gcalendar.Event) (*gcalendar.Event, error) {
+	return s.client.Events.Insert(calendarId, event).Do()
 }
 
 func (s *Service) GetNumCalendars() (int, error) {

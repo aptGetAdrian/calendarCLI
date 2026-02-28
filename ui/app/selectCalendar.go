@@ -40,9 +40,8 @@ func newSelectCalendarModel(service *calendar.Service, state AppState, width, he
 		})
 	}
 
-	l := BuildList("Select Calendar", items, ui.MainMenu)
+	l := BuildList("Select Calendar", items, ui.MainMenu, width, height)
 	l.SetShowStatusBar(false)
-	l.SetSize(width, height)
 
 	return &selectCalendarModel{
 		service: service,

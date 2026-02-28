@@ -12,7 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func BuildList(title string, items []list.Item, menu ui.Menu) list.Model {
+func BuildList(title string, items []list.Item, menu ui.Menu, width, height int) list.Model {
 
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles.NormalTitle = styles.ListItemTitle
@@ -23,6 +23,7 @@ func BuildList(title string, items []list.Item, menu ui.Menu) list.Model {
 	l := list.New(items, delegate, 0, 0)
 
 	l.Title = title
+	l.SetSize(width, height)
 
 	switch menu {
 	case ui.MainMenu:
@@ -44,7 +45,7 @@ func buildStatusLine(state *AppState) string {
 		calCount = styles.InfoText.Render(fmt.Sprintf("%d calendars", state.CalendarCount))
 	}
 
-	selected := styles.WarningText.Render("Selected: " + state.SelectedCalendar)
+	selected := styles.WarningText.Render("Selected calendar: " + state.SelectedCalendar)
 	selectedItem := styles.AccentText.Render("Selected menu item: " + state.SelectedMenuItem)
 
 	return fmt.Sprintf("%s • %s • %s • %s", authText, calCount, selected, selectedItem)
@@ -57,13 +58,6 @@ func buildStatusBar(state *AppState, width int) string {
 		Width(width).
 		Render(statusLine)
 }
-
-// func (m *model) updateSelectedMenuItem(name string) {
-// 	m.state.SelectedMenuItem = fmt.Sprintf("\"%s\"", name)
-// }
-// func (m *model) updateSelectedCalendar(name string) {
-// 	m.state.SelectedMenuItem = fmt.Sprintf("\"%s\"", name)
-// }
 
 func setAppState(service *calendar.Service) AppState {
 	calendarCount, err := service.GetNumCalendars()
@@ -116,12 +110,17 @@ func (m *RootModel) handleNavigation(msg NavigateTo) (tea.Model, tea.Cmd) {
 		m.child = child
 		return m, child.Init()
 	case ui.MainMenuScreen:
-		child := newMainMenuModel(m.state)
+		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight())
 		m.activeScreen = screenMainMenu
 		m.child = child
 		sized, sizeCmd := child.Update(sizedMsg{width: m.contentWidth(), height: m.contentHeight()})
 		m.child = sized
 		return m, tea.Batch(child.Init(), sizeCmd)
+	case ui.CreateEventScreen:
+		child := newCreateEventModel(m.service, m.state, m.contentWidth(), m.contentHeight())
+		m.activeScreen = screenCreateEvent
+		m.child = child
+		return m, child.Init()
 	}
 	return m, nil
 }

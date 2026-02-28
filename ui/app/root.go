@@ -16,6 +16,7 @@ const (
 	screenMainMenu       ui.Screen = ui.MainMenuScreen
 	screenSelectCalendar ui.Screen = ui.SelectCalendarScreen
 	screenListEvents     ui.Screen = ui.ListEventsScreen
+	screenCreateEvent    ui.Screen = ui.CreateEventScreen
 )
 
 type AppState struct {
@@ -44,7 +45,9 @@ type RootModel struct {
 func New(service *calendar.Service) tea.Model {
 	state := setAppState(service)
 
-	child := newMainMenuModel(state)
+	h, v := styles.DocStyle.GetFrameSize()
+
+	child := newMainMenuModel(state, h, v)
 
 	return &RootModel{
 		service:      service,
@@ -74,7 +77,13 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case calendarSelectedMsg:
 		m.state.SelectedCalendar = msg.calendarName
-		child := newMainMenuModel(m.state)
+		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight())
+		m.activeScreen = screenMainMenu
+		m.child = child
+		return m, child.Init()
+	case eventCreatedMsg:
+		// event saved — go back to main menu
+		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight())
 		m.activeScreen = screenMainMenu
 		m.child = child
 		return m, child.Init()
