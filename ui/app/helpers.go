@@ -2,6 +2,7 @@ package app
 
 import (
 	calendar "calendarCli/internal"
+	"calendarCli/internal/logger"
 	"calendarCli/ui"
 	"calendarCli/ui/styles"
 	"fmt"
@@ -102,15 +103,15 @@ func (m *RootModel) contentHeight() int {
 	return m.termHeight - v - statusBarHeight
 }
 
-func (m *RootModel) handleNavigation(msg NavigateTo) (tea.Model, tea.Cmd) {
+func (m *RootModel) handleNavigation(msg NavigateTo, logger *logger.Logger) (tea.Model, tea.Cmd) {
 	switch ui.Screen(msg.Screen) {
 	case ui.SelectCalendarScreen:
-		child := newSelectCalendarModel(m.service, m.state, m.contentWidth(), m.contentHeight())
+		child := newSelectCalendarModel(m.service, m.state, m.contentWidth(), m.contentHeight(), logger)
 		m.activeScreen = screenSelectCalendar
 		m.child = child
 		return m, child.Init()
 	case ui.MainMenuScreen:
-		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight())
+		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight(), logger)
 		m.activeScreen = screenMainMenu
 		m.child = child
 		sized, sizeCmd := child.Update(sizedMsg{width: m.contentWidth(), height: m.contentHeight()})

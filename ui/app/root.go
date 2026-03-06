@@ -41,6 +41,7 @@ type RootModel struct {
 	termWidth    int
 	termHeight   int
 	docStyle     lipgloss.Style
+	logger       *logger.Logger
 }
 
 func New(service *calendar.Service, logger *logger.Logger) tea.Model {
@@ -48,7 +49,7 @@ func New(service *calendar.Service, logger *logger.Logger) tea.Model {
 
 	h, v := styles.DocStyle.GetFrameSize()
 
-	child := newMainMenuModel(state, h, v)
+	child := newMainMenuModel(state, h, v, logger)
 
 	return &RootModel{
 		service:      service,
@@ -56,6 +57,7 @@ func New(service *calendar.Service, logger *logger.Logger) tea.Model {
 		activeScreen: screenMainMenu,
 		child:        child,
 		docStyle:     styles.DocStyle,
+		logger:       logger,
 	}
 }
 
@@ -74,17 +76,17 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case NavigateTo:
-		return m.handleNavigation(msg)
+		return m.handleNavigation(msg, m.logger)
 
 	case calendarSelectedMsg:
 		m.state.SelectedCalendar = msg.calendarName
-		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight())
+		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight(), m.logger)
 		m.activeScreen = screenMainMenu
 		m.child = child
 		return m, child.Init()
 	case eventCreatedMsg:
 		// event saved — go back to main menu
-		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight())
+		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight(), m.logger)
 		m.activeScreen = screenMainMenu
 		m.child = child
 		return m, child.Init()

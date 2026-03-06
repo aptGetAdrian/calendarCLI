@@ -1,6 +1,7 @@
 package app
 
 import (
+	"calendarCli/internal/logger"
 	"calendarCli/ui"
 	"calendarCli/ui/models"
 	"fmt"
@@ -11,11 +12,12 @@ import (
 )
 
 type mainMenuModel struct {
-	state AppState
-	list  list.Model
+	state  AppState
+	list   list.Model
+	logger *logger.Logger
 }
 
-func newMainMenuModel(state AppState, width, height int) *mainMenuModel {
+func newMainMenuModel(state AppState, width, height int, logger *logger.Logger) *mainMenuModel {
 	items, err := ui.LoadMenuItems("main_menu_items")
 	if err != nil {
 		fmt.Println("Error loading menu items:", err)
@@ -26,8 +28,9 @@ func newMainMenuModel(state AppState, width, height int) *mainMenuModel {
 	l.SetShowStatusBar(false)
 
 	return &mainMenuModel{
-		state: state,
-		list:  l,
+		state:  state,
+		list:   l,
+		logger: logger,
 	}
 }
 

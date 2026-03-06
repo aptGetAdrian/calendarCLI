@@ -2,6 +2,7 @@ package app
 
 import (
 	calendar "calendarCli/internal"
+	"calendarCli/internal/logger"
 	"calendarCli/ui"
 	"calendarCli/ui/models"
 	"fmt"
@@ -13,9 +14,10 @@ import (
 type selectCalendarModel struct {
 	service *calendar.Service
 	list    list.Model
+	logger  *logger.Logger
 }
 
-func newSelectCalendarModel(service *calendar.Service, state AppState, width, height int) *selectCalendarModel {
+func newSelectCalendarModel(service *calendar.Service, state AppState, width, height int, logger *logger.Logger) *selectCalendarModel {
 	calendars, err := service.GetAllCalendars()
 	if err != nil {
 		fmt.Printf("Couldn't retrieve calendar list: %s\n", err)
@@ -46,6 +48,7 @@ func newSelectCalendarModel(service *calendar.Service, state AppState, width, he
 	return &selectCalendarModel{
 		service: service,
 		list:    l,
+		logger:  logger,
 	}
 }
 
