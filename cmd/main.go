@@ -37,7 +37,7 @@ func main() {
 
 	appLogger.Info("Application starting")
 
-	svc, err := calendar.NewService()
+	svc, err := calendar.NewService(appLogger)
 	if err != nil {
 		fmt.Printf("%v", err)
 	}

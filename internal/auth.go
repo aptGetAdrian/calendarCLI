@@ -1,10 +1,10 @@
 package calendar
 
 import (
+	"calendarCli/internal/logger"
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
@@ -16,7 +16,7 @@ import (
 
 // EnsureConnected checks if the user is already authenticated.
 // Returns a ready-to-use calendar service if token.json exists, otherwise prints a message and exits.
-func EnsureConnected() *calendar.Service {
+func EnsureConnected(logger *logger.Logger) *calendar.Service {
 	ctx := context.Background()
 	tokFile := "token.json"
 	if _, err := os.Stat(tokFile); os.IsNotExist(err) {
@@ -36,7 +36,7 @@ func EnsureConnected() *calendar.Service {
 		os.Exit(1)
 	}
 
-	client, err := getClient(config)
+	client, err := getClient(config, logger)
 	srv, err := calendar.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		fmt.Printf("Unable to create Calendar service: %v\n", err)
@@ -51,15 +51,15 @@ func EnsureConnected() *calendar.Service {
 ////////////////////////////////////////////////////////////////
 
 // Retrieve a token, saves the token, then returns the generated client.
-func getClient(config *oauth2.Config) (*http.Client, error) {
+func getClient(config *oauth2.Config, logger *logger.Logger) (*http.Client, error) {
 	// The file token.json stores the user's access and refresh tokens, and is
 	// created automatically when the authorization flow completes for the first
 	// time.
 	tokFile := "token.json"
 	tok, err := tokenFromFile(tokFile)
 	if err != nil {
-		tok = getTokenFromWeb(config)
-		saveToken(tokFile, tok)
+		tok = getTokenFromWeb(config, logger)
+		saveToken(tokFile, tok, logger)
 		fmt.Printf("You are now authenticated and have your access and refresh tokens stored in a \"tokens.json\" file\n")
 		return config.Client(context.Background(), tok), nil
 	} else {
@@ -69,7 +69,7 @@ func getClient(config *oauth2.Config) (*http.Client, error) {
 }
 
 // Request a token from the web, then returns the retrieved token.
-func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
+func getTokenFromWeb(config *oauth2.Config, logger *logger.Logger) *oauth2.Token {
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	// TODO: tu naredi, da bo neki lep line vmes, recimo to "------------"
 	fmt.Printf("Go to the following link in your browser then type the "+
@@ -83,12 +83,14 @@ func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 
 	var authCode string
 	if _, err := fmt.Scan(&authCode); err != nil {
-		log.Fatalf("Unable to read authorization code: %v", err)
+		fmt.Printf("An error was encountered, unable to proceed...\nCheck the logs for more info.")
+		logger.Fatalf("Unable to read authorization code: %v", err)
 	}
 
 	tok, err := config.Exchange(context.TODO(), authCode)
 	if err != nil {
-		log.Fatalf("Unable to retrieve token from web: %v", err)
+		fmt.Printf("An error was encountered, unable to proceed...\nCheck the logs for more info.")
+		logger.Fatalf("Unable to retrieve token from web: %v", err)
 	}
 	return tok
 }
@@ -106,11 +108,11 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
 }
 
 // Saves a token to a file path.
-func saveToken(path string, token *oauth2.Token) {
+func saveToken(path string, token *oauth2.Token, logger *logger.Logger) {
 	fmt.Printf("Saving credential file to: %s\n", path)
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		log.Fatalf("Unable to cache oauth token: %v", err)
+		logger.Fatalf("Unable to cache oauth token: %v", err)
 	}
 	defer f.Close()
 	json.NewEncoder(f).Encode(token)

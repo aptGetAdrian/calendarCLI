@@ -1,6 +1,7 @@
 package calendar
 
 import (
+	"calendarCli/internal/logger"
 	"context"
 	"os"
 
@@ -13,7 +14,7 @@ type Service struct {
 	client *gcalendar.Service
 }
 
-func NewService() (*Service, error) {
+func NewService(logger *logger.Logger) (*Service, error) {
 	ctx := context.Background()
 
 	b, err := os.ReadFile("credentials.json")
@@ -26,7 +27,7 @@ func NewService() (*Service, error) {
 		return nil, err
 	}
 
-	client, err := getClient(config)
+	client, err := getClient(config, logger)
 	if err != nil {
 		return nil, err
 	}
