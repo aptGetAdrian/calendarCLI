@@ -2,6 +2,7 @@ package app
 
 import (
 	calendar "calendarCli/internal"
+	"calendarCli/internal/logger"
 	"calendarCli/ui"
 	"calendarCli/ui/styles"
 	"fmt"
@@ -42,7 +43,7 @@ type RootModel struct {
 	docStyle     lipgloss.Style
 }
 
-func New(service *calendar.Service) tea.Model {
+func New(service *calendar.Service, logger *logger.Logger) tea.Model {
 	state := setAppState(service)
 
 	h, v := styles.DocStyle.GetFrameSize()
