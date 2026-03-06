@@ -4,8 +4,6 @@ import (
 	"calendarCli/internal/logger"
 	"calendarCli/ui"
 	"calendarCli/ui/models"
-	"fmt"
-	"os"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -20,8 +18,7 @@ type mainMenuModel struct {
 func newMainMenuModel(state AppState, width, height int, logger *logger.Logger) *mainMenuModel {
 	items, err := ui.LoadMenuItems("main_menu_items")
 	if err != nil {
-		fmt.Println("Error loading menu items:", err)
-		os.Exit(1)
+		logger.Fatalf("Error loading menu items:", err)
 	}
 
 	l := BuildList("Main menu", items, ui.MainMenu, width, height)

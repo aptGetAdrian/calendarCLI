@@ -6,7 +6,6 @@ import (
 	"calendarCli/ui"
 	"calendarCli/ui/styles"
 	"fmt"
-	"log"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -60,16 +59,16 @@ func buildStatusBar(state *AppState, width int) string {
 		Render(statusLine)
 }
 
-func setAppState(service *calendar.Service) AppState {
+func setAppState(service *calendar.Service, logger *logger.Logger) AppState {
 	calendarCount, err := service.GetNumCalendars()
 	if err != nil {
-		log.Printf("Failed to get list of calendars: %v", err)
+		logger.Error("Failed to get list of calendars: %v", err)
 		calendarCount = 0
 	}
 
 	selectedCalendar, err := service.GetPrimaryCalendar()
 	if err != nil {
-		log.Printf("Failed to get primary calendar: %v", err)
+		logger.Error("Failed to get primary calendar: %v", err)
 		selectedCalendar = ""
 	}
 
@@ -118,7 +117,7 @@ func (m *RootModel) handleNavigation(msg NavigateTo, logger *logger.Logger) (tea
 		m.child = sized
 		return m, tea.Batch(child.Init(), sizeCmd)
 	case ui.CreateEventScreen:
-		child := newCreateEventModel(m.service, m.state, m.contentWidth(), m.contentHeight())
+		child := newCreateEventModel(m.service, m.state, m.contentWidth(), m.contentHeight(), logger)
 		m.activeScreen = screenCreateEvent
 		m.child = child
 		return m, child.Init()

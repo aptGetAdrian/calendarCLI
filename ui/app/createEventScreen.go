@@ -2,6 +2,7 @@ package app
 
 import (
 	calendar "calendarCli/internal"
+	"calendarCli/internal/logger"
 	"calendarCli/ui"
 	"calendarCli/ui/styles"
 	"fmt"
@@ -27,6 +28,8 @@ type createEventModel struct {
 	description string
 	startStr    string
 	endStr      string
+
+	logger *logger.Logger
 }
 
 var (
@@ -92,7 +95,7 @@ func init() {
 	t.Blurred.SelectedOption = lipgloss.NewStyle().Foreground(fgMuted)
 }
 
-func newCreateEventModel(service *calendar.Service, state AppState, width, height int) *createEventModel {
+func newCreateEventModel(service *calendar.Service, state AppState, width, height int, logger *logger.Logger) *createEventModel {
 	calendars, err := service.GetAllCalendars()
 	calendarOptions := []huh.Option[string]{}
 	if err == nil {
@@ -233,7 +236,7 @@ func (m *createEventModel) submitEvent() tea.Cmd {
 
 		_, err := m.service.CreateEvent(m.calendarID, m.title, m.location, m.description, start, end)
 		if err != nil {
-			fmt.Printf("Error creating event: %s\n", err)
+			m.logger.Error("Error creating event: %s", err)
 			return NavigateTo{Screen: ui.MainMenuScreen}
 		}
 

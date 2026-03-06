@@ -5,7 +5,6 @@ import (
 	"calendarCli/internal/logger"
 	"calendarCli/ui"
 	"calendarCli/ui/models"
-	"fmt"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -20,7 +19,7 @@ type selectCalendarModel struct {
 func newSelectCalendarModel(service *calendar.Service, state AppState, width, height int, logger *logger.Logger) *selectCalendarModel {
 	calendars, err := service.GetAllCalendars()
 	if err != nil {
-		fmt.Printf("Couldn't retrieve calendar list: %s\n", err)
+		logger.Error("Couldn't retrieve calendar list: %s", err)
 	}
 
 	items := make([]list.Item, len(calendars.Items))
@@ -33,7 +32,7 @@ func newSelectCalendarModel(service *calendar.Service, state AppState, width, he
 	}
 
 	if birthdayEvents, err := service.ExistBirthday(); err != nil {
-		fmt.Println("Error checking birthdays:", err)
+		logger.Error("Error checking birthdays:", err)
 	} else if birthdayEvents {
 		items = append(items, models.MenuItem{
 			TitleValue: "Birthdays",
@@ -80,7 +79,7 @@ func (m *selectCalendarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				name, err := m.service.SelectCalendar(selected.TitleValue)
 				if err != nil {
-					fmt.Printf("Couldn't retrieve calendar name: %s\n", err)
+					m.logger.Error("Couldn't retrieve calendar name: %s", err)
 					return m, nil
 				}
 				calendarName = name

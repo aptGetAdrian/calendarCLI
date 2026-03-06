@@ -45,7 +45,7 @@ type RootModel struct {
 }
 
 func New(service *calendar.Service, logger *logger.Logger) tea.Model {
-	state := setAppState(service)
+	state := setAppState(service, logger)
 
 	h, v := styles.DocStyle.GetFrameSize()
 
