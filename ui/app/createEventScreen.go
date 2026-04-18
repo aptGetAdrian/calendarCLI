@@ -194,7 +194,7 @@ func renderCalGrid(c calPicker, focused bool) string {
 	accent := lipgloss.Color(styles.ColorSecondaryFg)
 	border := lipgloss.Color(styles.ColorSecondaryBorder)
 	dim := lipgloss.Color(styles.ColorBorder)
-	dimmer := lipgloss.Color("238")
+	dimmer := lipgloss.Color("246")
 	warn := lipgloss.Color(styles.ColorWarning)
 
 	var arrowSty, monthSty, dowSty, daySty, todaySty, selSty lipgloss.Style
@@ -202,16 +202,16 @@ func renderCalGrid(c calPicker, focused bool) string {
 		arrowSty = lipgloss.NewStyle().Foreground(accent)
 		monthSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
 		dowSty   = lipgloss.NewStyle().Foreground(dim)
-		daySty   = lipgloss.NewStyle().Foreground(dim)
+		daySty   = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
 		todaySty = lipgloss.NewStyle().Foreground(warn).Bold(true)
 		selSty   = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorBlack)).Background(border).Bold(true)
 	} else {
-		arrowSty = lipgloss.NewStyle().Foreground(dimmer)
+		arrowSty = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 		monthSty = lipgloss.NewStyle().Foreground(dimmer)
-		dowSty   = lipgloss.NewStyle().Foreground(dimmer)
+		dowSty   = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
 		daySty   = lipgloss.NewStyle().Foreground(dimmer)
-		todaySty = lipgloss.NewStyle().Foreground(dimmer)
-		selSty   = lipgloss.NewStyle().Foreground(dim).Underline(true)
+		todaySty = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+		selSty   = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Underline(true)
 	}
 
 	mStr := fmt.Sprintf("%s %d", c.month.String()[:3], c.year)
@@ -293,7 +293,9 @@ type createEventModel struct {
 	endMin      int
 }
 
-func (m *createEventModel) isTwoColumn() bool { return layoutWidth(m.width) >= ceWideTh }
+func (m *createEventModel) isTwoColumn() bool {
+	return layoutWidth(m.width) >= ceWideTh && m.height >= ceTitleBarH+27
+}
 
 func ceLeftW(totalW int) int {
 	if w := totalW - ceRightW - 3; w >= 20 {
@@ -345,7 +347,7 @@ func newCreateEventModel(service *calendar.Service, state AppState, width, heigh
 		ti.Width = iw
 		ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorSecondaryBorder))
 		ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorWhite))
-		ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Faint(true)
+		ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
 		ti.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorSecondaryFg))
 		ti.Blur()
 		return ti
@@ -704,10 +706,9 @@ func (m *createEventModel) renderInputField(label, content string, focused bool,
 	accent := lipgloss.Color(styles.ColorSecondaryFg)
 	bord := lipgloss.Color(styles.ColorSecondaryBorder)
 	dim := lipgloss.Color(styles.ColorBorder)
-	dimmer := lipgloss.Color("238")
 
 	labelSty := lipgloss.NewStyle().Foreground(dim)
-	borderColor := dimmer
+	borderColor := lipgloss.Color("240")
 	if focused {
 		labelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
 		borderColor = bord
@@ -724,23 +725,23 @@ func (m *createEventModel) renderCalSelect(focused bool, w int) string {
 	accent := lipgloss.Color(styles.ColorSecondaryFg)
 	bord := lipgloss.Color(styles.ColorSecondaryBorder)
 	dim := lipgloss.Color(styles.ColorBorder)
-	dimmer := lipgloss.Color("238")
 
 	labelSty := lipgloss.NewStyle().Foreground(dim)
-	borderColor := dimmer
+	borderColor := lipgloss.Color("240")
 	if focused {
 		labelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
 		borderColor = bord
 	}
 
+	muted := lipgloss.Color("244")
 	var content string
 	if len(m.calOpts) == 0 {
-		content = lipgloss.NewStyle().Foreground(dimmer).Render("(no calendars)")
+		content = lipgloss.NewStyle().Foreground(muted).Render("(no calendars)")
 	} else {
 		name := m.calOpts[m.calIdx].name
 		if focused {
-			upSty := lipgloss.NewStyle().Foreground(dimmer)
-			downSty := lipgloss.NewStyle().Foreground(dimmer)
+			upSty := lipgloss.NewStyle().Foreground(muted)
+			downSty := lipgloss.NewStyle().Foreground(muted)
 			if m.calIdx > 0 {
 				upSty = lipgloss.NewStyle().Foreground(accent)
 			}
@@ -779,7 +780,7 @@ func (m *createEventModel) renderRight() string {
 		endLbl = lipgloss.NewStyle().Foreground(accent).Bold(true)
 	}
 
-	divider := lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render(strings.Repeat("─", ceRightW))
+	divider := lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Render(strings.Repeat("─", ceRightW))
 
 	startSec := strings.Join([]string{
 		startLbl.Render("Start"),
@@ -836,8 +837,8 @@ func (m *createEventModel) renderTimePicker(hr, min int, hrFocused, minFocused b
 
 	hrSty := lipgloss.NewStyle().Foreground(dim)
 	minSty := lipgloss.NewStyle().Foreground(dim)
-	upSty := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
-	downSty := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
+	upSty := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+	downSty := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 
 	if hrFocused {
 		hrSty = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorBlack)).Background(bord).Bold(true)
@@ -867,14 +868,14 @@ func (m *createEventModel) renderSubmit() string {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color(styles.ColorBorder)).
 		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("238")).
+		BorderForeground(lipgloss.Color("243")).
 		Padding(0, 2).
 		Render("  Create Event  ")
 }
 
 func (m *createEventModel) renderHelp() string {
 	key := lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorSecondaryBorder))
-	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
 
 	base := key.Render("tab") + dim.Render("/") + key.Render("enter") + dim.Render(" next · ") +
 		key.Render("shift+tab") + dim.Render(" prev · ") +
