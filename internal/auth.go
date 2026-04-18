@@ -16,6 +16,7 @@ import (
 
 // EnsureConnected checks if the user is already authenticated.
 // Returns a ready-to-use calendar service if token.json exists, otherwise prints a message and exits.
+// UNUSED FUNCTION, MAYBE START CALLING IT LATER IN MAIN.GO
 func EnsureConnected(logger *logger.Logger) *calendar.Service {
 	ctx := context.Background()
 	tokFile := "token.json"
