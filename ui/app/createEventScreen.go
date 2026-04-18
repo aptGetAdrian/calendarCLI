@@ -38,10 +38,20 @@ const (
 // ceRightW    = 23 chars (calendar grid 21 + 2 padding).
 // ceWideTh    = min width to use 2-column layout.
 const (
-	ceTitleBarH = 4
-	ceRightW    = 23
-	ceWideTh    = 60
+	ceTitleBarH    = 4
+	ceRightW       = 23
+	ceWideTh       = 60
+	ceMaxContentW  = 100 // cap for very wide terminals
 )
+
+// layoutWidth returns the effective content width, capped so the layout
+// doesn't stretch absurdly on ultra-wide terminals (e.g. i3 docked pane).
+func layoutWidth(w int) int {
+	if w > ceMaxContentW {
+		return ceMaxContentW
+	}
+	return w
+}
 
 // ─── body line positions ──────────────────────────────────────────────────────
 //
@@ -283,7 +293,7 @@ type createEventModel struct {
 	endMin      int
 }
 
-func (m *createEventModel) isTwoColumn() bool { return m.width >= ceWideTh }
+func (m *createEventModel) isTwoColumn() bool { return layoutWidth(m.width) >= ceWideTh }
 
 func ceLeftW(totalW int) int {
 	if w := totalW - ceRightW - 3; w >= 20 {
@@ -325,8 +335,9 @@ func newCreateEventModel(service *calendar.Service, state AppState, width, heigh
 		}
 	}
 
-	twoCol := width >= ceWideTh
-	iw := inputWidth(width, twoCol)
+	lw := layoutWidth(width)
+	twoCol := lw >= ceWideTh
+	iw := inputWidth(lw, twoCol)
 
 	mkInput := func(placeholder string) textinput.Model {
 		ti := textinput.New()
@@ -393,7 +404,7 @@ func (m *createEventModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case sizedMsg:
 		m.width, m.height = msg.width, msg.height
-		iw := inputWidth(m.width, m.isTwoColumn())
+		iw := inputWidth(layoutWidth(m.width), m.isTwoColumn())
 		m.titleInput.Width = iw
 		m.locationInput.Width = iw
 		m.descInput.Width = iw
@@ -647,7 +658,7 @@ func (m *createEventModel) buildBody() string {
 }
 
 func (m *createEventModel) buildTwoColBody() string {
-	leftW := ceLeftW(m.width)
+	leftW := ceLeftW(layoutWidth(m.width))
 	leftBox := lipgloss.NewStyle().Width(leftW).PaddingRight(3)
 	panels := lipgloss.JoinHorizontal(lipgloss.Top,
 		leftBox.Render(m.renderLeft(leftW)),
@@ -665,7 +676,7 @@ func (m *createEventModel) buildTwoColBody() string {
 }
 
 func (m *createEventModel) buildOneColBody() string {
-	parts := []string{"", m.renderLeft(m.width), "", m.renderDatesSideBySide(), ""}
+	parts := []string{"", m.renderLeft(layoutWidth(m.width)), "", m.renderDatesSideBySide(), ""}
 	if m.errMsg != "" {
 		parts = append(parts,
 			lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorError)).Render("  ⚠  "+m.errMsg),
