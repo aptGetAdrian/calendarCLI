@@ -23,7 +23,7 @@ const (
 	ceCalendar         // up/down cycles calendars
 	ceLocation
 	ceDesc
-	ceStartCal // month grid, arrows navigate days
+	ceStartCal // month grid; arrows navigate days
 	ceStartHr  // up/down ±1 hour
 	ceStartMin // up/down ±5 min
 	ceEndCal
@@ -32,6 +32,111 @@ const (
 	ceSubmit
 	ceFieldCount
 )
+
+// Layout constants.
+// ceTitleBarH = 3 lines (rounded border) + 1 blank separator = 4.
+// ceRightW    = 23 chars (calendar grid 21 + 2 padding).
+// ceWideTh    = min width to use 2-column layout.
+const (
+	ceTitleBarH = 4
+	ceRightW    = 23
+	ceWideTh    = 60
+)
+
+// ─── body line positions ──────────────────────────────────────────────────────
+//
+// The "body" is everything rendered below the title bar.  Both layouts share
+// the same scroll machinery; only the line numbers differ.
+//
+// 2-column body:
+//   0         ""
+//   1-27      panels (JoinHorizontal, always 27 lines)
+//              left col  0-10  : Title(0-1) gap(2) Cal(3-4) gap(5) Loc(6-7) gap(8) Desc(9-10)
+//              right col 0-26  : Start(0-11) gap(12) div(13) gap(14) End(15-26)
+//   28        ""
+//   29-31     submit   [+2 if errMsg]
+//   32        ""       [+2 if errMsg]
+//   33        help     [+2 if errMsg]
+//
+// 1-column body:
+//   0         ""
+//   1-11      left fields
+//   12        ""
+//   13-24     dates side-by-side (12 lines, always)
+//   25        ""
+//   26-28     submit   [+2 if errMsg]
+//   29        ""       [+2 if errMsg]
+//   30        help     [+2 if errMsg]
+
+func (m *createEventModel) fieldScrollLine(f ceField) int {
+	err := m.errMsg != ""
+	if m.isTwoColumn() {
+		switch f {
+		case ceTitle:
+			return 1
+		case ceCalendar:
+			return 4
+		case ceLocation:
+			return 7
+		case ceDesc:
+			return 10
+		case ceStartCal, ceStartHr, ceStartMin:
+			return 1 // top of right panel
+		case ceEndCal, ceEndHr, ceEndMin:
+			return 16 // end section inside right panel
+		case ceSubmit:
+			if err {
+				return 31
+			}
+			return 29
+		}
+	} else {
+		switch f {
+		case ceTitle:
+			return 1
+		case ceCalendar:
+			return 4
+		case ceLocation:
+			return 7
+		case ceDesc:
+			return 10
+		case ceStartCal, ceStartHr, ceStartMin, ceEndCal, ceEndHr, ceEndMin:
+			return 13
+		case ceSubmit:
+			if err {
+				return 28
+			}
+			return 26
+		}
+	}
+	return 0
+}
+
+func fieldScrollHeight(f ceField) int {
+	switch f {
+	case ceStartCal, ceStartHr, ceStartMin, ceEndCal, ceEndHr, ceEndMin:
+		return 12
+	case ceSubmit:
+		return 3
+	default:
+		return 2
+	}
+}
+
+// clipAndPad slices lines[offset:offset+avail] and pads with blank lines so
+// the result is always exactly avail lines — this keeps the status bar pinned.
+func clipAndPad(lines []string, offset, avail int) string {
+	end := offset + avail
+	if end > len(lines) {
+		end = len(lines)
+	}
+	if offset > end {
+		offset = end
+	}
+	out := make([]string, avail) // zero-value = ""
+	copy(out, lines[offset:end])
+	return strings.Join(out, "\n")
+}
 
 // ─── calendar grid widget ─────────────────────────────────────────────────────
 
@@ -53,8 +158,8 @@ func (c *calPicker) shiftDay(d int) {
 func (c *calPicker) shiftMonth(d int) {
 	t := time.Date(c.year, c.month, 1, 0, 0, 0, 0, time.Local).AddDate(0, d, 0)
 	c.year, c.month = t.Year(), t.Month()
-	if max := calMonthDays(c.year, c.month); c.day > max {
-		c.day = max
+	if mx := calMonthDays(c.year, c.month); c.day > mx {
+		c.day = mx
 	}
 }
 
@@ -67,12 +172,11 @@ func centerIn(s string, width int) string {
 	if n >= width {
 		return s
 	}
-	left := (width - n) / 2
-	right := width - n - left
-	return strings.Repeat(" ", left) + s + strings.Repeat(" ", right)
+	l := (width - n) / 2
+	return strings.Repeat(" ", l) + s + strings.Repeat(" ", width-n-l)
 }
 
-// renderCalGrid renders a month calendar grid. Each cell is 3 chars wide.
+// renderCalGrid always emits exactly 6 week rows → stable 8-line height.
 func renderCalGrid(c calPicker, focused bool) string {
 	now := time.Now()
 	todayY, todayM, todayD := now.Year(), now.Month(), now.Day()
@@ -83,14 +187,7 @@ func renderCalGrid(c calPicker, focused bool) string {
 	dimmer := lipgloss.Color("238")
 	warn := lipgloss.Color(styles.ColorWarning)
 
-	var (
-		arrowSty lipgloss.Style
-		monthSty lipgloss.Style
-		dowSty   lipgloss.Style
-		daySty   lipgloss.Style
-		todaySty lipgloss.Style
-		selSty   lipgloss.Style
-	)
+	var arrowSty, monthSty, dowSty, daySty, todaySty, selSty lipgloss.Style
 	if focused {
 		arrowSty = lipgloss.NewStyle().Foreground(accent)
 		monthSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
@@ -107,18 +204,15 @@ func renderCalGrid(c calPicker, focused bool) string {
 		selSty   = lipgloss.NewStyle().Foreground(dim).Underline(true)
 	}
 
-	// Header: "◀  Apr 2026  ▶" centered in 21 chars
 	mStr := fmt.Sprintf("%s %d", c.month.String()[:3], c.year)
 	header := arrowSty.Render("◀") + monthSty.Render(centerIn(mStr, 19)) + arrowSty.Render("▶")
 
-	// Day-of-week row (3 chars each)
 	dows := []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
 	var dowRow string
 	for _, d := range dows {
 		dowRow += dowSty.Render(fmt.Sprintf("%-3s", d))
 	}
 
-	// Compute first weekday (Mon=0)
 	wd := int(time.Date(c.year, c.month, 1, 0, 0, 0, 0, time.Local).Weekday())
 	if wd == 0 {
 		wd = 7
@@ -126,11 +220,11 @@ func renderCalGrid(c calPicker, focused bool) string {
 	wd--
 
 	total := calMonthDays(c.year, c.month)
-	blank := daySty.Render("   ") // 3 spaces
+	blank := daySty.Render("   ")
 
 	var gridRows []string
 	day := 1
-	for row := 0; row < 6 && day <= total; row++ {
+	for row := 0; row < 6; row++ { // always 6 rows → stable height
 		var rowStr string
 		for col := 0; col < 7; col++ {
 			if row == 0 && col < wd {
@@ -142,12 +236,10 @@ func renderCalGrid(c calPicker, focused bool) string {
 				continue
 			}
 			cell := fmt.Sprintf("%2d ", day)
-			isSel := day == c.day
-			isToday := day == todayD && c.month == todayM && c.year == todayY
 			switch {
-			case isSel:
+			case day == c.day:
 				rowStr += selSty.Render(cell)
-			case isToday:
+			case day == todayD && c.month == todayM && c.year == todayY:
 				rowStr += todaySty.Render(cell)
 			default:
 				rowStr += daySty.Render(cell)
@@ -157,8 +249,7 @@ func renderCalGrid(c calPicker, focused bool) string {
 		gridRows = append(gridRows, rowStr)
 	}
 
-	lines := append([]string{header, dowRow}, gridRows...)
-	return strings.Join(lines, "\n")
+	return strings.Join(append([]string{header, dowRow}, gridRows...), "\n")
 }
 
 // ─── model ────────────────────────────────────────────────────────────────────
@@ -172,9 +263,10 @@ type createEventModel struct {
 	height  int
 	logger  *logger.Logger
 
-	focused   ceField
-	submitted bool
-	errMsg    string
+	focused      ceField
+	submitted    bool
+	errMsg       string
+	scrollOffset int
 
 	titleInput    textinput.Model
 	locationInput textinput.Model
@@ -186,13 +278,32 @@ type createEventModel struct {
 	startPicker calPicker
 	startHr     int
 	startMin    int
-
-	endPicker calPicker
-	endHr     int
-	endMin    int
+	endPicker   calPicker
+	endHr       int
+	endMin      int
 }
 
-const ceRightW = 23 // fixed width of the right panel (calendar grid = 21 + 2 padding)
+func (m *createEventModel) isTwoColumn() bool { return m.width >= ceWideTh }
+
+func ceLeftW(totalW int) int {
+	if w := totalW - ceRightW - 3; w >= 20 {
+		return w
+	}
+	return 20
+}
+
+func inputWidth(w int, twoCol bool) int {
+	var iw int
+	if twoCol {
+		iw = ceLeftW(w) - 4
+	} else {
+		iw = w - 4
+	}
+	if iw < 10 {
+		return 10
+	}
+	return iw
+}
 
 func newCreateEventModel(service *calendar.Service, state AppState, width, height int, log *logger.Logger) *createEventModel {
 	now := time.Now()
@@ -214,15 +325,13 @@ func newCreateEventModel(service *calendar.Service, state AppState, width, heigh
 		}
 	}
 
-	inputW := ceLeftW(width) - 4
-	if inputW < 10 {
-		inputW = 10
-	}
+	twoCol := width >= ceWideTh
+	iw := inputWidth(width, twoCol)
 
 	mkInput := func(placeholder string) textinput.Model {
 		ti := textinput.New()
 		ti.Placeholder = placeholder
-		ti.Width = inputW
+		ti.Width = iw
 		ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorSecondaryBorder))
 		ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorWhite))
 		ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Faint(true)
@@ -255,15 +364,26 @@ func newCreateEventModel(service *calendar.Service, state AppState, width, heigh
 	}
 }
 
-func ceLeftW(totalW int) int {
-	w := totalW - ceRightW - 3 // 3 = gap between panels
-	if w < 20 {
-		return 20
+// ─── scroll ───────────────────────────────────────────────────────────────────
+
+func (m *createEventModel) updateScroll() {
+	target := m.fieldScrollLine(m.focused)
+	h := fieldScrollHeight(m.focused)
+	avail := m.height - ceTitleBarH
+	if avail < 1 {
+		avail = 1
 	}
-	return w
+	if target < m.scrollOffset {
+		m.scrollOffset = target
+	} else if target+h > m.scrollOffset+avail {
+		m.scrollOffset = target + h - avail
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
 }
 
-// ─── Bubble Tea interface ─────────────────────────────────────────────────────
+// ─── Bubble Tea ───────────────────────────────────────────────────────────────
 
 func (m *createEventModel) Init() tea.Cmd {
 	return textinput.Blink
@@ -273,13 +393,11 @@ func (m *createEventModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case sizedMsg:
 		m.width, m.height = msg.width, msg.height
-		inputW := ceLeftW(m.width) - 4
-		if inputW < 10 {
-			inputW = 10
-		}
-		m.titleInput.Width = inputW
-		m.locationInput.Width = inputW
-		m.descInput.Width = inputW
+		iw := inputWidth(m.width, m.isTwoColumn())
+		m.titleInput.Width = iw
+		m.locationInput.Width = iw
+		m.descInput.Width = iw
+		m.updateScroll()
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -304,7 +422,7 @@ func (m *createEventModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, textinput.Blink
 	}
 
-	// Text inputs consume all other keys when focused
+	// Text inputs consume remaining keys when focused
 	var cmd tea.Cmd
 	switch m.focused {
 	case ceTitle:
@@ -318,7 +436,6 @@ func (m *createEventModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// Directional keys for non-text fields
 	switch key {
 	case "up":
 		m.arrowUp()
@@ -343,7 +460,6 @@ func (m *createEventModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.endPicker.shiftMonth(1)
 		}
 	}
-
 	return m, nil
 }
 
@@ -363,6 +479,7 @@ func (m *createEventModel) moveFocus(dir int) {
 	case ceDesc:
 		m.descInput.Focus()
 	}
+	m.updateScroll()
 }
 
 func (m *createEventModel) arrowUp() {
@@ -433,6 +550,7 @@ func (m *createEventModel) submit() tea.Cmd {
 		m.descInput.Blur()
 		m.focused = ceTitle
 		m.titleInput.Focus()
+		m.updateScroll()
 		return textinput.Blink
 	}
 
@@ -447,6 +565,7 @@ func (m *createEventModel) submit() tea.Cmd {
 		m.locationInput.Blur()
 		m.descInput.Blur()
 		m.focused = ceEndCal
+		m.updateScroll()
 		return nil
 	}
 
@@ -454,7 +573,6 @@ func (m *createEventModel) submit() tea.Cmd {
 	if len(m.calOpts) > 0 {
 		calID = m.calOpts[m.calIdx].id
 	}
-
 	title := m.titleInput.Value()
 	location := m.locationInput.Value()
 	desc := m.descInput.Value()
@@ -471,13 +589,23 @@ func (m *createEventModel) submit() tea.Cmd {
 }
 
 // ─── View ─────────────────────────────────────────────────────────────────────
+//
+// The title bar is always rendered at the top outside the scroll viewport.
+// The body is clipped to exactly (m.height - ceTitleBarH) lines and padded
+// with blank lines when the content is shorter — this keeps the root model's
+// status bar pinned to the bottom of the terminal regardless of content height.
 
 func (m *createEventModel) View() string {
 	if m.submitted {
-		return lipgloss.NewStyle().
-			PaddingTop(2).PaddingLeft(4).
-			Foreground(lipgloss.Color(styles.ColorSecondaryFg)).
-			Render("Creating event...")
+		// Fill the full height so the status bar stays at the bottom.
+		lines := make([]string, m.height)
+		if m.height > 2 {
+			lines[2] = lipgloss.NewStyle().
+				PaddingLeft(4).
+				Foreground(lipgloss.Color(styles.ColorSecondaryFg)).
+				Render("Creating event...")
+		}
+		return strings.Join(lines, "\n")
 	}
 
 	titleBar := lipgloss.NewStyle().
@@ -488,39 +616,69 @@ func (m *createEventModel) View() string {
 		Background(lipgloss.Color(styles.ColorSecondaryBg)).
 		Render("Create Event")
 
-	// 2-column needs ~35 rows: right panel (start+end stacked) is ~27 lines + chrome
-	var panels string
-	if m.height >= 35 {
-		leftW := ceLeftW(m.width)
-		left := m.renderLeft(leftW)
-		right := m.renderRight()
-		leftBox := lipgloss.NewStyle().Width(leftW).PaddingRight(3)
-		panels = lipgloss.JoinHorizontal(lipgloss.Top, leftBox.Render(left), right)
-	} else {
-		left := m.renderLeft(m.width)
-		dates := m.renderDatesSideBySide()
-		panels = strings.Join([]string{left, "", dates}, "\n")
+	body := m.buildBody()
+	lines := strings.Split(body, "\n")
+
+	avail := m.height - ceTitleBarH
+	if avail < 1 {
+		avail = 1
 	}
 
-	submit := m.renderSubmit()
-	help := m.renderHelp()
+	// Clamp scroll offset so it stays within valid range.
+	if maxOff := len(lines) - avail; m.scrollOffset > maxOff {
+		if maxOff < 0 {
+			m.scrollOffset = 0
+		} else {
+			m.scrollOffset = maxOff
+		}
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
 
-	var parts []string
-	parts = append(parts, titleBar, "", panels, "")
+	return titleBar + "\n" + clipAndPad(lines, m.scrollOffset, avail)
+}
+
+func (m *createEventModel) buildBody() string {
+	if m.isTwoColumn() {
+		return m.buildTwoColBody()
+	}
+	return m.buildOneColBody()
+}
+
+func (m *createEventModel) buildTwoColBody() string {
+	leftW := ceLeftW(m.width)
+	leftBox := lipgloss.NewStyle().Width(leftW).PaddingRight(3)
+	panels := lipgloss.JoinHorizontal(lipgloss.Top,
+		leftBox.Render(m.renderLeft(leftW)),
+		m.renderRight(),
+	)
+
+	parts := []string{"", panels, ""}
 	if m.errMsg != "" {
-		parts = append(parts, lipgloss.NewStyle().
-			Foreground(lipgloss.Color(styles.ColorError)).
-			Render("  ⚠  "+m.errMsg), "")
+		parts = append(parts,
+			lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorError)).Render("  ⚠  "+m.errMsg),
+			"")
 	}
-	parts = append(parts, submit, "", help)
+	parts = append(parts, m.renderSubmit(), "", m.renderHelp())
+	return strings.Join(parts, "\n")
+}
 
+func (m *createEventModel) buildOneColBody() string {
+	parts := []string{"", m.renderLeft(m.width), "", m.renderDatesSideBySide(), ""}
+	if m.errMsg != "" {
+		parts = append(parts,
+			lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorError)).Render("  ⚠  "+m.errMsg),
+			"")
+	}
+	parts = append(parts, m.renderSubmit(), "", m.renderHelp())
 	return strings.Join(parts, "\n")
 }
 
 // ─── sub-renderers ────────────────────────────────────────────────────────────
 
 func (m *createEventModel) renderLeft(w int) string {
-	rows := []string{
+	return strings.Join([]string{
 		m.renderInputField("Title", m.titleInput.View(), m.focused == ceTitle, w),
 		"",
 		m.renderCalSelect(m.focused == ceCalendar, w),
@@ -528,13 +686,12 @@ func (m *createEventModel) renderLeft(w int) string {
 		m.renderInputField("Location", m.locationInput.View(), m.focused == ceLocation, w),
 		"",
 		m.renderInputField("Description", m.descInput.View(), m.focused == ceDesc, w),
-	}
-	return strings.Join(rows, "\n")
+	}, "\n")
 }
 
 func (m *createEventModel) renderInputField(label, content string, focused bool, w int) string {
 	accent := lipgloss.Color(styles.ColorSecondaryFg)
-	border := lipgloss.Color(styles.ColorSecondaryBorder)
+	bord := lipgloss.Color(styles.ColorSecondaryBorder)
 	dim := lipgloss.Color(styles.ColorBorder)
 	dimmer := lipgloss.Color("238")
 
@@ -542,22 +699,19 @@ func (m *createEventModel) renderInputField(label, content string, focused bool,
 	borderColor := dimmer
 	if focused {
 		labelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
-		borderColor = border
+		borderColor = bord
 	}
 
 	box := lipgloss.NewStyle().
-		BorderLeft(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(borderColor).
-		PaddingLeft(1).
-		Width(w - 2)
+		BorderLeft(true).BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(borderColor).PaddingLeft(1).Width(w - 2)
 
 	return labelSty.Render(label) + "\n" + box.Render(content)
 }
 
 func (m *createEventModel) renderCalSelect(focused bool, w int) string {
 	accent := lipgloss.Color(styles.ColorSecondaryFg)
-	border := lipgloss.Color(styles.ColorSecondaryBorder)
+	bord := lipgloss.Color(styles.ColorSecondaryBorder)
 	dim := lipgloss.Color(styles.ColorBorder)
 	dimmer := lipgloss.Color("238")
 
@@ -565,7 +719,7 @@ func (m *createEventModel) renderCalSelect(focused bool, w int) string {
 	borderColor := dimmer
 	if focused {
 		labelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
-		borderColor = border
+		borderColor = bord
 	}
 
 	var content string
@@ -591,15 +745,13 @@ func (m *createEventModel) renderCalSelect(focused bool, w int) string {
 	}
 
 	box := lipgloss.NewStyle().
-		BorderLeft(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(borderColor).
-		PaddingLeft(1).
-		Width(w - 2)
+		BorderLeft(true).BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(borderColor).PaddingLeft(1).Width(w - 2)
 
 	return labelSty.Render("Calendar") + "\n" + box.Render(content)
 }
 
+// renderRight: start then end pickers stacked — 2-column mode right panel (27 lines).
 func (m *createEventModel) renderRight() string {
 	dim := lipgloss.Color(styles.ColorBorder)
 	accent := lipgloss.Color(styles.ColorSecondaryFg)
@@ -607,34 +759,33 @@ func (m *createEventModel) renderRight() string {
 	startFocused := m.focused == ceStartCal || m.focused == ceStartHr || m.focused == ceStartMin
 	endFocused := m.focused == ceEndCal || m.focused == ceEndHr || m.focused == ceEndMin
 
-	startLabelSty := lipgloss.NewStyle().Foreground(dim)
+	startLbl := lipgloss.NewStyle().Foreground(dim)
 	if startFocused {
-		startLabelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
+		startLbl = lipgloss.NewStyle().Foreground(accent).Bold(true)
 	}
-	endLabelSty := lipgloss.NewStyle().Foreground(dim)
+	endLbl := lipgloss.NewStyle().Foreground(dim)
 	if endFocused {
-		endLabelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
+		endLbl = lipgloss.NewStyle().Foreground(accent).Bold(true)
 	}
 
-	divider := lipgloss.NewStyle().Foreground(lipgloss.Color("238")).
-		Render(strings.Repeat("─", ceRightW))
+	divider := lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render(strings.Repeat("─", ceRightW))
 
-	startSection := strings.Join([]string{
-		startLabelSty.Render("Start"),
+	startSec := strings.Join([]string{
+		startLbl.Render("Start"),
 		renderCalGrid(m.startPicker, m.focused == ceStartCal),
 		m.renderTimePicker(m.startHr, m.startMin, m.focused == ceStartHr, m.focused == ceStartMin),
 	}, "\n")
 
-	endSection := strings.Join([]string{
-		endLabelSty.Render("End"),
+	endSec := strings.Join([]string{
+		endLbl.Render("End"),
 		renderCalGrid(m.endPicker, m.focused == ceEndCal),
 		m.renderTimePicker(m.endHr, m.endMin, m.focused == ceEndHr, m.focused == ceEndMin),
 	}, "\n")
 
-	return strings.Join([]string{startSection, "", divider, "", endSection}, "\n")
+	return strings.Join([]string{startSec, "", divider, "", endSec}, "\n")
 }
 
-// renderDatesSideBySide places start and end pickers next to each other — used in 1-column mode.
+// renderDatesSideBySide: start and end pickers side by side — 1-column mode (12 lines).
 func (m *createEventModel) renderDatesSideBySide() string {
 	dim := lipgloss.Color(styles.ColorBorder)
 	accent := lipgloss.Color(styles.ColorSecondaryFg)
@@ -642,34 +793,34 @@ func (m *createEventModel) renderDatesSideBySide() string {
 	startFocused := m.focused == ceStartCal || m.focused == ceStartHr || m.focused == ceStartMin
 	endFocused := m.focused == ceEndCal || m.focused == ceEndHr || m.focused == ceEndMin
 
-	startLabelSty := lipgloss.NewStyle().Foreground(dim)
+	startLbl := lipgloss.NewStyle().Foreground(dim)
 	if startFocused {
-		startLabelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
+		startLbl = lipgloss.NewStyle().Foreground(accent).Bold(true)
 	}
-	endLabelSty := lipgloss.NewStyle().Foreground(dim)
+	endLbl := lipgloss.NewStyle().Foreground(dim)
 	if endFocused {
-		endLabelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
+		endLbl = lipgloss.NewStyle().Foreground(accent).Bold(true)
 	}
 
-	startSection := strings.Join([]string{
-		startLabelSty.Render("Start"),
+	startSec := strings.Join([]string{
+		startLbl.Render("Start"),
 		renderCalGrid(m.startPicker, m.focused == ceStartCal),
 		m.renderTimePicker(m.startHr, m.startMin, m.focused == ceStartHr, m.focused == ceStartMin),
 	}, "\n")
 
-	endSection := strings.Join([]string{
-		endLabelSty.Render("End"),
+	endSec := strings.Join([]string{
+		endLbl.Render("End"),
 		renderCalGrid(m.endPicker, m.focused == ceEndCal),
 		m.renderTimePicker(m.endHr, m.endMin, m.focused == ceEndHr, m.focused == ceEndMin),
 	}, "\n")
 
 	startBox := lipgloss.NewStyle().Width(ceRightW).PaddingRight(4)
-	return lipgloss.JoinHorizontal(lipgloss.Top, startBox.Render(startSection), endSection)
+	return lipgloss.JoinHorizontal(lipgloss.Top, startBox.Render(startSec), endSec)
 }
 
 func (m *createEventModel) renderTimePicker(hr, min int, hrFocused, minFocused bool) string {
 	accent := lipgloss.Color(styles.ColorSecondaryFg)
-	border := lipgloss.Color(styles.ColorSecondaryBorder)
+	bord := lipgloss.Color(styles.ColorSecondaryBorder)
 	dim := lipgloss.Color(styles.ColorBorder)
 
 	hrSty := lipgloss.NewStyle().Foreground(dim)
@@ -678,42 +829,28 @@ func (m *createEventModel) renderTimePicker(hr, min int, hrFocused, minFocused b
 	downSty := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
 
 	if hrFocused {
-		hrSty = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(styles.ColorBlack)).
-			Background(border).Bold(true)
+		hrSty = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorBlack)).Background(bord).Bold(true)
 		upSty = lipgloss.NewStyle().Foreground(accent)
 		downSty = lipgloss.NewStyle().Foreground(accent)
 	} else if minFocused {
-		minSty = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(styles.ColorBlack)).
-			Background(border).Bold(true)
+		minSty = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorBlack)).Background(bord).Bold(true)
 		upSty = lipgloss.NewStyle().Foreground(accent)
 		downSty = lipgloss.NewStyle().Foreground(accent)
 	}
 
-	sepSty := lipgloss.NewStyle().Foreground(dim)
-
-	// "  ▲     ▲  "
-	// "  HH  :  MM  "
-	// "  ▼     ▼  "
-	hrStr := fmt.Sprintf("%02d", hr)
-	minStr := fmt.Sprintf("%02d", min)
-
+	sep := lipgloss.NewStyle().Foreground(dim)
 	line1 := fmt.Sprintf("  %s     %s", upSty.Render("▲"), upSty.Render("▲"))
-	line2 := fmt.Sprintf("  %s %s %s", hrSty.Render(hrStr), sepSty.Render(":"), minSty.Render(minStr))
+	line2 := fmt.Sprintf("  %s %s %s", hrSty.Render(fmt.Sprintf("%02d", hr)), sep.Render(":"), minSty.Render(fmt.Sprintf("%02d", min)))
 	line3 := fmt.Sprintf("  %s     %s", downSty.Render("▼"), downSty.Render("▼"))
-
 	return strings.Join([]string{line1, line2, line3}, "\n")
 }
 
 func (m *createEventModel) renderSubmit() string {
-	focused := m.focused == ceSubmit
-	if focused {
+	if m.focused == ceSubmit {
 		return lipgloss.NewStyle().
 			Foreground(lipgloss.Color(styles.ColorBlack)).
 			Background(lipgloss.Color(styles.ColorSecondaryFg)).
-			Bold(true).
-			Padding(0, 2).
+			Bold(true).Padding(0, 2).
 			Render("  Create Event  ")
 	}
 	return lipgloss.NewStyle().
@@ -744,6 +881,5 @@ func (m *createEventModel) renderHelp() string {
 	case ceCalendar:
 		extra = dim.Render("  ·  ") + key.Render("↑↓") + dim.Render(" cycle calendars")
 	}
-
 	return base + extra
 }
