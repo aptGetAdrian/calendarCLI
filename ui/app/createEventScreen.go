@@ -442,7 +442,11 @@ func (m *createEventModel) submit() tea.Cmd {
 		m.endHr, m.endMin, 0, 0, time.Local)
 
 	if !end.After(start) {
-		m.errMsg = "End must be after start"
+		m.errMsg = "End must be after start — fix the end date"
+		m.titleInput.Blur()
+		m.locationInput.Blur()
+		m.descInput.Blur()
+		m.focused = ceEndCal
 		return nil
 	}
 
@@ -484,12 +488,19 @@ func (m *createEventModel) View() string {
 		Background(lipgloss.Color(styles.ColorSecondaryBg)).
 		Render("Create Event")
 
-	leftW := ceLeftW(m.width)
-	left := m.renderLeft(leftW)
-	right := m.renderRight()
-
-	leftBox := lipgloss.NewStyle().Width(leftW).PaddingRight(3)
-	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftBox.Render(left), right)
+	// 2-column needs ~35 rows: right panel (start+end stacked) is ~27 lines + chrome
+	var panels string
+	if m.height >= 35 {
+		leftW := ceLeftW(m.width)
+		left := m.renderLeft(leftW)
+		right := m.renderRight()
+		leftBox := lipgloss.NewStyle().Width(leftW).PaddingRight(3)
+		panels = lipgloss.JoinHorizontal(lipgloss.Top, leftBox.Render(left), right)
+	} else {
+		left := m.renderLeft(m.width)
+		dates := m.renderDatesSideBySide()
+		panels = strings.Join([]string{left, "", dates}, "\n")
+	}
 
 	submit := m.renderSubmit()
 	help := m.renderHelp()
@@ -621,6 +632,39 @@ func (m *createEventModel) renderRight() string {
 	}, "\n")
 
 	return strings.Join([]string{startSection, "", divider, "", endSection}, "\n")
+}
+
+// renderDatesSideBySide places start and end pickers next to each other — used in 1-column mode.
+func (m *createEventModel) renderDatesSideBySide() string {
+	dim := lipgloss.Color(styles.ColorBorder)
+	accent := lipgloss.Color(styles.ColorSecondaryFg)
+
+	startFocused := m.focused == ceStartCal || m.focused == ceStartHr || m.focused == ceStartMin
+	endFocused := m.focused == ceEndCal || m.focused == ceEndHr || m.focused == ceEndMin
+
+	startLabelSty := lipgloss.NewStyle().Foreground(dim)
+	if startFocused {
+		startLabelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
+	}
+	endLabelSty := lipgloss.NewStyle().Foreground(dim)
+	if endFocused {
+		endLabelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
+	}
+
+	startSection := strings.Join([]string{
+		startLabelSty.Render("Start"),
+		renderCalGrid(m.startPicker, m.focused == ceStartCal),
+		m.renderTimePicker(m.startHr, m.startMin, m.focused == ceStartHr, m.focused == ceStartMin),
+	}, "\n")
+
+	endSection := strings.Join([]string{
+		endLabelSty.Render("End"),
+		renderCalGrid(m.endPicker, m.focused == ceEndCal),
+		m.renderTimePicker(m.endHr, m.endMin, m.focused == ceEndHr, m.focused == ceEndMin),
+	}, "\n")
+
+	startBox := lipgloss.NewStyle().Width(ceRightW).PaddingRight(4)
+	return lipgloss.JoinHorizontal(lipgloss.Top, startBox.Render(startSection), endSection)
 }
 
 func (m *createEventModel) renderTimePicker(hr, min int, hrFocused, minFocused bool) string {
