@@ -6,240 +6,700 @@ import (
 	"calendarCli/ui"
 	"calendarCli/ui/styles"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 )
 
+// ─── field enum (tab order) ───────────────────────────────────────────────────
+
+type ceField int
+
+const (
+	ceTitle    ceField = iota
+	ceCalendar         // up/down cycles calendars
+	ceLocation
+	ceDesc
+	ceStartCal // month grid, arrows navigate days
+	ceStartHr  // up/down ±1 hour
+	ceStartMin // up/down ±5 min
+	ceEndCal
+	ceEndHr
+	ceEndMin
+	ceSubmit
+	ceFieldCount
+)
+
+// ─── calendar grid widget ─────────────────────────────────────────────────────
+
+type calPicker struct {
+	year  int
+	month time.Month
+	day   int
+}
+
+func newCalPicker(t time.Time) calPicker {
+	return calPicker{year: t.Year(), month: t.Month(), day: t.Day()}
+}
+
+func (c *calPicker) shiftDay(d int) {
+	t := time.Date(c.year, c.month, c.day, 0, 0, 0, 0, time.Local).AddDate(0, 0, d)
+	c.year, c.month, c.day = t.Year(), t.Month(), t.Day()
+}
+
+func (c *calPicker) shiftMonth(d int) {
+	t := time.Date(c.year, c.month, 1, 0, 0, 0, 0, time.Local).AddDate(0, d, 0)
+	c.year, c.month = t.Year(), t.Month()
+	if max := calMonthDays(c.year, c.month); c.day > max {
+		c.day = max
+	}
+}
+
+func calMonthDays(y int, m time.Month) int {
+	return time.Date(y, m+1, 0, 0, 0, 0, 0, time.Local).Day()
+}
+
+func centerIn(s string, width int) string {
+	n := len(s)
+	if n >= width {
+		return s
+	}
+	left := (width - n) / 2
+	right := width - n - left
+	return strings.Repeat(" ", left) + s + strings.Repeat(" ", right)
+}
+
+// renderCalGrid renders a month calendar grid. Each cell is 3 chars wide.
+func renderCalGrid(c calPicker, focused bool) string {
+	now := time.Now()
+	todayY, todayM, todayD := now.Year(), now.Month(), now.Day()
+
+	accent := lipgloss.Color(styles.ColorSecondaryFg)
+	border := lipgloss.Color(styles.ColorSecondaryBorder)
+	dim := lipgloss.Color(styles.ColorBorder)
+	dimmer := lipgloss.Color("238")
+	warn := lipgloss.Color(styles.ColorWarning)
+
+	var (
+		arrowSty lipgloss.Style
+		monthSty lipgloss.Style
+		dowSty   lipgloss.Style
+		daySty   lipgloss.Style
+		todaySty lipgloss.Style
+		selSty   lipgloss.Style
+	)
+	if focused {
+		arrowSty = lipgloss.NewStyle().Foreground(accent)
+		monthSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
+		dowSty   = lipgloss.NewStyle().Foreground(dim)
+		daySty   = lipgloss.NewStyle().Foreground(dim)
+		todaySty = lipgloss.NewStyle().Foreground(warn).Bold(true)
+		selSty   = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorBlack)).Background(border).Bold(true)
+	} else {
+		arrowSty = lipgloss.NewStyle().Foreground(dimmer)
+		monthSty = lipgloss.NewStyle().Foreground(dimmer)
+		dowSty   = lipgloss.NewStyle().Foreground(dimmer)
+		daySty   = lipgloss.NewStyle().Foreground(dimmer)
+		todaySty = lipgloss.NewStyle().Foreground(dimmer)
+		selSty   = lipgloss.NewStyle().Foreground(dim).Underline(true)
+	}
+
+	// Header: "◀  Apr 2026  ▶" centered in 21 chars
+	mStr := fmt.Sprintf("%s %d", c.month.String()[:3], c.year)
+	header := arrowSty.Render("◀") + monthSty.Render(centerIn(mStr, 19)) + arrowSty.Render("▶")
+
+	// Day-of-week row (3 chars each)
+	dows := []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
+	var dowRow string
+	for _, d := range dows {
+		dowRow += dowSty.Render(fmt.Sprintf("%-3s", d))
+	}
+
+	// Compute first weekday (Mon=0)
+	wd := int(time.Date(c.year, c.month, 1, 0, 0, 0, 0, time.Local).Weekday())
+	if wd == 0 {
+		wd = 7
+	}
+	wd--
+
+	total := calMonthDays(c.year, c.month)
+	blank := daySty.Render("   ") // 3 spaces
+
+	var gridRows []string
+	day := 1
+	for row := 0; row < 6 && day <= total; row++ {
+		var rowStr string
+		for col := 0; col < 7; col++ {
+			if row == 0 && col < wd {
+				rowStr += blank
+				continue
+			}
+			if day > total {
+				rowStr += blank
+				continue
+			}
+			cell := fmt.Sprintf("%2d ", day)
+			isSel := day == c.day
+			isToday := day == todayD && c.month == todayM && c.year == todayY
+			switch {
+			case isSel:
+				rowStr += selSty.Render(cell)
+			case isToday:
+				rowStr += todaySty.Render(cell)
+			default:
+				rowStr += daySty.Render(cell)
+			}
+			day++
+		}
+		gridRows = append(gridRows, rowStr)
+	}
+
+	lines := append([]string{header, dowRow}, gridRows...)
+	return strings.Join(lines, "\n")
+}
+
+// ─── model ────────────────────────────────────────────────────────────────────
+
+type calOpt struct{ name, id string }
+
 type createEventModel struct {
 	service *calendar.Service
-	form    *huh.Form
 	state   AppState
 	width   int
 	height  int
+	logger  *logger.Logger
 
+	focused   ceField
 	submitted bool
+	errMsg    string
 
-	calendarID  string
-	title       string
-	location    string
-	description string
-	startStr    string
-	endStr      string
+	titleInput    textinput.Model
+	locationInput textinput.Model
+	descInput     textinput.Model
 
-	logger *logger.Logger
+	calOpts []calOpt
+	calIdx  int
+
+	startPicker calPicker
+	startHr     int
+	startMin    int
+
+	endPicker calPicker
+	endHr     int
+	endMin    int
 }
 
-var (
-	createEventTitleStyle = lipgloss.NewStyle().
-				BorderStyle(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color(styles.ColorSecondaryBorder)).
-				Padding(0, 2).
-				Bold(true).
-				Foreground(lipgloss.Color(styles.ColorSecondaryFg)).
-				Background(lipgloss.Color(styles.ColorSecondaryBg))
+const ceRightW = 23 // fixed width of the right panel (calendar grid = 21 + 2 padding)
 
-	createEventTheme        = huh.ThemeBase()
-	createEventWrapperStyle = lipgloss.NewStyle().PaddingTop(1).PaddingLeft(2)
-)
+func newCreateEventModel(service *calendar.Service, state AppState, width, height int, log *logger.Logger) *createEventModel {
+	now := time.Now()
+	startBase := now.Add(time.Hour).Round(15 * time.Minute)
+	endBase := startBase.Add(time.Hour)
 
-func init() {
-	// Define theme first, before using it in the form
-	t := huh.ThemeBase()
-
-	fg := lipgloss.Color(styles.ColorWhite)
-	fgMuted := lipgloss.Color(styles.ColorBorder)
-	accent := lipgloss.Color(styles.ColorSecondaryFg)
-	accentBorder := lipgloss.Color(styles.ColorSecondaryBorder)
-
-	noBase := lipgloss.NewStyle()
-
-	t.Focused.Base = noBase.BorderLeft(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(accentBorder).
-		PaddingLeft(1)
-	t.Focused.Title = lipgloss.NewStyle().Foreground(accent).Bold(true)
-	t.Focused.Description = lipgloss.NewStyle().Foreground(fgMuted)
-	t.Focused.ErrorIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorError))
-	t.Focused.ErrorMessage = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorError))
-	t.Focused.SelectSelector = lipgloss.NewStyle().Foreground(accent)
-	t.Focused.Option = lipgloss.NewStyle().Foreground(fg)
-	t.Focused.SelectedOption = lipgloss.NewStyle().Foreground(accent).Bold(true)
-
-	// Focused text input styles
-	t.Focused.TextInput.Text = lipgloss.NewStyle().Foreground(fg)
-	t.Focused.TextInput.Placeholder = lipgloss.NewStyle().
-		Foreground(fgMuted).
-		Italic(true) // Optional: adds visual distinction
-	t.Focused.TextInput.Cursor = lipgloss.NewStyle().Foreground(accent)
-	t.Focused.TextInput.Prompt = lipgloss.NewStyle().Foreground(accentBorder)
-
-	t.Blurred.Base = noBase.BorderLeft(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("0")).
-		PaddingLeft(1)
-	t.Blurred.Title = lipgloss.NewStyle().Foreground(fgMuted)
-	t.Blurred.Description = lipgloss.NewStyle().Foreground(fgMuted)
-
-	// Blurred text input styles - making placeholders less opaque than the text
-	t.Blurred.TextInput.Text = lipgloss.NewStyle().Foreground(fgMuted) // Regular text
-	t.Blurred.TextInput.Placeholder = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("237")).
-		Faint(true) // Makes it more transparent/less opaque
-	t.Blurred.TextInput.Prompt = lipgloss.NewStyle().Foreground(fgMuted)
-
-	t.Blurred.SelectSelector = lipgloss.NewStyle().Foreground(fgMuted)
-	t.Blurred.Option = lipgloss.NewStyle().Foreground(fgMuted)
-	t.Blurred.SelectedOption = lipgloss.NewStyle().Foreground(fgMuted)
-}
-
-func newCreateEventModel(service *calendar.Service, state AppState, width, height int, logger *logger.Logger) *createEventModel {
-	calendars, err := service.GetAllCalendars()
-	calendarOptions := []huh.Option[string]{}
-	if err == nil {
-		for _, cal := range calendars.Items {
-			calendarOptions = append(calendarOptions, huh.NewOption(cal.Summary, cal.Id))
+	calOpts := []calOpt{}
+	if cals, err := service.GetAllCalendars(); err == nil {
+		for _, c := range cals.Items {
+			calOpts = append(calOpts, calOpt{c.Summary, c.Id})
 		}
 	}
 
-	m := &createEventModel{
-		service:    service,
-		state:      state,
-		calendarID: state.SelectedCalendar,
-		width:      width,
-		height:     height,
+	calIdx := 0
+	for i, o := range calOpts {
+		if o.id == state.SelectedCalendar || o.name == state.SelectedCalendar {
+			calIdx = i
+			break
+		}
 	}
 
-	// single group = all fields visible at once
-	m.form = huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Description("Which calendar to add this event to?").
-				Options(calendarOptions...).
-				Value(&m.calendarID),
+	inputW := ceLeftW(width) - 4
+	if inputW < 10 {
+		inputW = 10
+	}
 
-			huh.NewInput().
-				Title("Title").
-				Placeholder("Team standup").
-				Value(&m.title).
-				Validate(func(s string) error {
-					if s == "" {
-						return fmt.Errorf("title is required")
-					}
-					return nil
-				}),
+	mkInput := func(placeholder string) textinput.Model {
+		ti := textinput.New()
+		ti.Placeholder = placeholder
+		ti.Width = inputW
+		ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorSecondaryBorder))
+		ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorWhite))
+		ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Faint(true)
+		ti.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorSecondaryFg))
+		ti.Blur()
+		return ti
+	}
 
-			huh.NewInput().
-				Title("Location").
-				Placeholder("Conference room / Google Meet link").
-				Value(&m.location),
+	titleIn := mkInput("Team standup")
+	titleIn.Focus()
 
-			huh.NewText().
-				Title("Description").
-				Placeholder("What's this event about?").
-				CharLimit(500).
-				Value(&m.description),
-
-			huh.NewInput().
-				Title("Start").
-				Placeholder("2026-03-15 14:00").
-				Value(&m.startStr).
-				Validate(func(s string) error {
-					_, err := time.ParseInLocation("2006-01-02 15:04", s, time.Local)
-					if err != nil {
-						return fmt.Errorf("use format YYYY-MM-DD HH:MM")
-					}
-					return nil
-				}),
-
-			huh.NewInput().
-				Title("End").
-				Placeholder("2026-03-15 15:00").
-				Value(&m.endStr).
-				Validate(func(s string) error {
-					_, err := time.ParseInLocation("2006-01-02 15:04", s, time.Local)
-					if err != nil {
-						return fmt.Errorf("use format YYYY-MM-DD HH:MM")
-					}
-					return nil
-				}),
-		),
-	).
-		WithWidth(width).
-		WithHeight(m.formHeight(height)).
-		WithTheme(createEventTheme)
-
-	return m
+	return &createEventModel{
+		service:       service,
+		state:         state,
+		width:         width,
+		height:        height,
+		logger:        log,
+		focused:       ceTitle,
+		titleInput:    titleIn,
+		locationInput: mkInput("Conference room / Meet link"),
+		descInput:     mkInput("What's this event about?"),
+		calOpts:       calOpts,
+		calIdx:        calIdx,
+		startPicker:   newCalPicker(startBase),
+		startHr:       startBase.Hour(),
+		startMin:      startBase.Minute(),
+		endPicker:     newCalPicker(endBase),
+		endHr:         endBase.Hour(),
+		endMin:        endBase.Minute(),
+	}
 }
 
+func ceLeftW(totalW int) int {
+	w := totalW - ceRightW - 3 // 3 = gap between panels
+	if w < 20 {
+		return 20
+	}
+	return w
+}
+
+// ─── Bubble Tea interface ─────────────────────────────────────────────────────
+
 func (m *createEventModel) Init() tea.Cmd {
-	return m.form.Init()
+	return textinput.Blink
 }
 
 func (m *createEventModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case sizedMsg:
-		m.width = msg.width
-		m.height = msg.height
-		m.form = m.form.WithWidth(msg.width).WithHeight(m.formHeight(msg.height))
+		m.width, m.height = msg.width, msg.height
+		inputW := ceLeftW(m.width) - 4
+		if inputW < 10 {
+			inputW = 10
+		}
+		m.titleInput.Width = inputW
+		m.locationInput.Width = inputW
+		m.descInput.Width = inputW
 		return m, nil
-
 	case tea.KeyMsg:
-		if msg.String() == "esc" {
-			return m, func() tea.Msg { return NavigateTo{Screen: ui.MainMenuScreen} }
+		return m.handleKey(msg)
+	}
+	return m, nil
+}
+
+func (m *createEventModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+
+	switch key {
+	case "esc":
+		return m, func() tea.Msg { return NavigateTo{Screen: ui.MainMenuScreen} }
+	case "tab", "enter":
+		if m.focused == ceSubmit {
+			return m, m.submit()
+		}
+		m.moveFocus(1)
+		return m, textinput.Blink
+	case "shift+tab":
+		m.moveFocus(-1)
+		return m, textinput.Blink
+	}
+
+	// Text inputs consume all other keys when focused
+	var cmd tea.Cmd
+	switch m.focused {
+	case ceTitle:
+		m.titleInput, cmd = m.titleInput.Update(msg)
+		return m, cmd
+	case ceLocation:
+		m.locationInput, cmd = m.locationInput.Update(msg)
+		return m, cmd
+	case ceDesc:
+		m.descInput, cmd = m.descInput.Update(msg)
+		return m, cmd
+	}
+
+	// Directional keys for non-text fields
+	switch key {
+	case "up":
+		m.arrowUp()
+	case "down":
+		m.arrowDown()
+	case "left":
+		m.arrowLeft()
+	case "right":
+		m.arrowRight()
+	case "[", "pgup":
+		switch m.focused {
+		case ceStartCal:
+			m.startPicker.shiftMonth(-1)
+		case ceEndCal:
+			m.endPicker.shiftMonth(-1)
+		}
+	case "]", "pgdown":
+		switch m.focused {
+		case ceStartCal:
+			m.startPicker.shiftMonth(1)
+		case ceEndCal:
+			m.endPicker.shiftMonth(1)
 		}
 	}
 
-	form, cmd := m.form.Update(msg)
-	if f, ok := form.(*huh.Form); ok {
-		m.form = f
-	}
-
-	if m.form.State == huh.StateCompleted && !m.submitted {
-		m.submitted = true
-		m.form = nil
-		return m, m.submitEvent()
-	}
-
-	return m, cmd
+	return m, nil
 }
 
-func (m *createEventModel) View() string {
-	if m.submitted {
-		return "Creating event..."
+func (m *createEventModel) moveFocus(dir int) {
+	m.titleInput.Blur()
+	m.locationInput.Blur()
+	m.descInput.Blur()
+	m.errMsg = ""
+
+	m.focused = ceField((int(m.focused) + int(ceFieldCount) + dir) % int(ceFieldCount))
+
+	switch m.focused {
+	case ceTitle:
+		m.titleInput.Focus()
+	case ceLocation:
+		m.locationInput.Focus()
+	case ceDesc:
+		m.descInput.Focus()
+	}
+}
+
+func (m *createEventModel) arrowUp() {
+	switch m.focused {
+	case ceCalendar:
+		if m.calIdx > 0 {
+			m.calIdx--
+		}
+	case ceStartCal:
+		m.startPicker.shiftDay(-7)
+	case ceStartHr:
+		m.startHr = (m.startHr + 23) % 24
+	case ceStartMin:
+		m.startMin = (m.startMin + 55) % 60
+	case ceEndCal:
+		m.endPicker.shiftDay(-7)
+	case ceEndHr:
+		m.endHr = (m.endHr + 23) % 24
+	case ceEndMin:
+		m.endMin = (m.endMin + 55) % 60
+	}
+}
+
+func (m *createEventModel) arrowDown() {
+	switch m.focused {
+	case ceCalendar:
+		if m.calIdx < len(m.calOpts)-1 {
+			m.calIdx++
+		}
+	case ceStartCal:
+		m.startPicker.shiftDay(7)
+	case ceStartHr:
+		m.startHr = (m.startHr + 1) % 24
+	case ceStartMin:
+		m.startMin = (m.startMin + 5) % 60
+	case ceEndCal:
+		m.endPicker.shiftDay(7)
+	case ceEndHr:
+		m.endHr = (m.endHr + 1) % 24
+	case ceEndMin:
+		m.endMin = (m.endMin + 5) % 60
+	}
+}
+
+func (m *createEventModel) arrowLeft() {
+	switch m.focused {
+	case ceStartCal:
+		m.startPicker.shiftDay(-1)
+	case ceEndCal:
+		m.endPicker.shiftDay(-1)
+	}
+}
+
+func (m *createEventModel) arrowRight() {
+	switch m.focused {
+	case ceStartCal:
+		m.startPicker.shiftDay(1)
+	case ceEndCal:
+		m.endPicker.shiftDay(1)
+	}
+}
+
+func (m *createEventModel) submit() tea.Cmd {
+	if strings.TrimSpace(m.titleInput.Value()) == "" {
+		m.errMsg = "Title is required"
+		m.titleInput.Blur()
+		m.locationInput.Blur()
+		m.descInput.Blur()
+		m.focused = ceTitle
+		m.titleInput.Focus()
+		return textinput.Blink
 	}
 
-	title := createEventTitleStyle.Render("Create Event")
+	start := time.Date(m.startPicker.year, m.startPicker.month, m.startPicker.day,
+		m.startHr, m.startMin, 0, 0, time.Local)
+	end := time.Date(m.endPicker.year, m.endPicker.month, m.endPicker.day,
+		m.endHr, m.endMin, 0, 0, time.Local)
 
-	return createEventWrapperStyle.Render(
-		lipgloss.JoinVertical(
-			lipgloss.Left,
-			title,
-			m.form.View(),
-		),
-	)
-}
+	if !end.After(start) {
+		m.errMsg = "End must be after start"
+		return nil
+	}
 
-// formHeight reserves space for the title so the form doesn't overflow into the status bar
-func (m *createEventModel) formHeight(totalHeight int) int {
-	titleHeight := lipgloss.Height(createEventTitleStyle.Render("Create Event"))
-	_, wrapperV := createEventWrapperStyle.GetFrameSize()
-	return totalHeight - titleHeight - wrapperV
-}
+	calID := ""
+	if len(m.calOpts) > 0 {
+		calID = m.calOpts[m.calIdx].id
+	}
 
-func (m *createEventModel) submitEvent() tea.Cmd {
+	title := m.titleInput.Value()
+	location := m.locationInput.Value()
+	desc := m.descInput.Value()
+	m.submitted = true
+
 	return func() tea.Msg {
-		start, _ := time.ParseInLocation("2006-01-02 15:04", m.startStr, time.Local)
-		end, _ := time.ParseInLocation("2006-01-02 15:04", m.endStr, time.Local)
-
-		_, err := m.service.CreateEvent(m.calendarID, m.title, m.location, m.description, start, end)
+		_, err := m.service.CreateEvent(calID, title, location, desc, start, end)
 		if err != nil {
 			m.logger.Error("Error creating event: %s", err)
 			return NavigateTo{Screen: ui.MainMenuScreen}
 		}
-
 		return eventCreatedMsg{}
 	}
+}
+
+// ─── View ─────────────────────────────────────────────────────────────────────
+
+func (m *createEventModel) View() string {
+	if m.submitted {
+		return lipgloss.NewStyle().
+			PaddingTop(2).PaddingLeft(4).
+			Foreground(lipgloss.Color(styles.ColorSecondaryFg)).
+			Render("Creating event...")
+	}
+
+	titleBar := lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(styles.ColorSecondaryBorder)).
+		Padding(0, 2).Bold(true).
+		Foreground(lipgloss.Color(styles.ColorSecondaryFg)).
+		Background(lipgloss.Color(styles.ColorSecondaryBg)).
+		Render("Create Event")
+
+	leftW := ceLeftW(m.width)
+	left := m.renderLeft(leftW)
+	right := m.renderRight()
+
+	leftBox := lipgloss.NewStyle().Width(leftW).PaddingRight(3)
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftBox.Render(left), right)
+
+	submit := m.renderSubmit()
+	help := m.renderHelp()
+
+	var parts []string
+	parts = append(parts, titleBar, "", panels, "")
+	if m.errMsg != "" {
+		parts = append(parts, lipgloss.NewStyle().
+			Foreground(lipgloss.Color(styles.ColorError)).
+			Render("  ⚠  "+m.errMsg), "")
+	}
+	parts = append(parts, submit, "", help)
+
+	return strings.Join(parts, "\n")
+}
+
+// ─── sub-renderers ────────────────────────────────────────────────────────────
+
+func (m *createEventModel) renderLeft(w int) string {
+	rows := []string{
+		m.renderInputField("Title", m.titleInput.View(), m.focused == ceTitle, w),
+		"",
+		m.renderCalSelect(m.focused == ceCalendar, w),
+		"",
+		m.renderInputField("Location", m.locationInput.View(), m.focused == ceLocation, w),
+		"",
+		m.renderInputField("Description", m.descInput.View(), m.focused == ceDesc, w),
+	}
+	return strings.Join(rows, "\n")
+}
+
+func (m *createEventModel) renderInputField(label, content string, focused bool, w int) string {
+	accent := lipgloss.Color(styles.ColorSecondaryFg)
+	border := lipgloss.Color(styles.ColorSecondaryBorder)
+	dim := lipgloss.Color(styles.ColorBorder)
+	dimmer := lipgloss.Color("238")
+
+	labelSty := lipgloss.NewStyle().Foreground(dim)
+	borderColor := dimmer
+	if focused {
+		labelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
+		borderColor = border
+	}
+
+	box := lipgloss.NewStyle().
+		BorderLeft(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(borderColor).
+		PaddingLeft(1).
+		Width(w - 2)
+
+	return labelSty.Render(label) + "\n" + box.Render(content)
+}
+
+func (m *createEventModel) renderCalSelect(focused bool, w int) string {
+	accent := lipgloss.Color(styles.ColorSecondaryFg)
+	border := lipgloss.Color(styles.ColorSecondaryBorder)
+	dim := lipgloss.Color(styles.ColorBorder)
+	dimmer := lipgloss.Color("238")
+
+	labelSty := lipgloss.NewStyle().Foreground(dim)
+	borderColor := dimmer
+	if focused {
+		labelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
+		borderColor = border
+	}
+
+	var content string
+	if len(m.calOpts) == 0 {
+		content = lipgloss.NewStyle().Foreground(dimmer).Render("(no calendars)")
+	} else {
+		name := m.calOpts[m.calIdx].name
+		if focused {
+			upSty := lipgloss.NewStyle().Foreground(dimmer)
+			downSty := lipgloss.NewStyle().Foreground(dimmer)
+			if m.calIdx > 0 {
+				upSty = lipgloss.NewStyle().Foreground(accent)
+			}
+			if m.calIdx < len(m.calOpts)-1 {
+				downSty = lipgloss.NewStyle().Foreground(accent)
+			}
+			content = upSty.Render("▲") + " " +
+				lipgloss.NewStyle().Foreground(accent).Bold(true).Render(name) +
+				" " + downSty.Render("▼")
+		} else {
+			content = lipgloss.NewStyle().Foreground(dim).Render(name)
+		}
+	}
+
+	box := lipgloss.NewStyle().
+		BorderLeft(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(borderColor).
+		PaddingLeft(1).
+		Width(w - 2)
+
+	return labelSty.Render("Calendar") + "\n" + box.Render(content)
+}
+
+func (m *createEventModel) renderRight() string {
+	dim := lipgloss.Color(styles.ColorBorder)
+	accent := lipgloss.Color(styles.ColorSecondaryFg)
+
+	startFocused := m.focused == ceStartCal || m.focused == ceStartHr || m.focused == ceStartMin
+	endFocused := m.focused == ceEndCal || m.focused == ceEndHr || m.focused == ceEndMin
+
+	startLabelSty := lipgloss.NewStyle().Foreground(dim)
+	if startFocused {
+		startLabelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
+	}
+	endLabelSty := lipgloss.NewStyle().Foreground(dim)
+	if endFocused {
+		endLabelSty = lipgloss.NewStyle().Foreground(accent).Bold(true)
+	}
+
+	divider := lipgloss.NewStyle().Foreground(lipgloss.Color("238")).
+		Render(strings.Repeat("─", ceRightW))
+
+	startSection := strings.Join([]string{
+		startLabelSty.Render("Start"),
+		renderCalGrid(m.startPicker, m.focused == ceStartCal),
+		m.renderTimePicker(m.startHr, m.startMin, m.focused == ceStartHr, m.focused == ceStartMin),
+	}, "\n")
+
+	endSection := strings.Join([]string{
+		endLabelSty.Render("End"),
+		renderCalGrid(m.endPicker, m.focused == ceEndCal),
+		m.renderTimePicker(m.endHr, m.endMin, m.focused == ceEndHr, m.focused == ceEndMin),
+	}, "\n")
+
+	return strings.Join([]string{startSection, "", divider, "", endSection}, "\n")
+}
+
+func (m *createEventModel) renderTimePicker(hr, min int, hrFocused, minFocused bool) string {
+	accent := lipgloss.Color(styles.ColorSecondaryFg)
+	border := lipgloss.Color(styles.ColorSecondaryBorder)
+	dim := lipgloss.Color(styles.ColorBorder)
+
+	hrSty := lipgloss.NewStyle().Foreground(dim)
+	minSty := lipgloss.NewStyle().Foreground(dim)
+	upSty := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
+	downSty := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
+
+	if hrFocused {
+		hrSty = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(styles.ColorBlack)).
+			Background(border).Bold(true)
+		upSty = lipgloss.NewStyle().Foreground(accent)
+		downSty = lipgloss.NewStyle().Foreground(accent)
+	} else if minFocused {
+		minSty = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(styles.ColorBlack)).
+			Background(border).Bold(true)
+		upSty = lipgloss.NewStyle().Foreground(accent)
+		downSty = lipgloss.NewStyle().Foreground(accent)
+	}
+
+	sepSty := lipgloss.NewStyle().Foreground(dim)
+
+	// "  ▲     ▲  "
+	// "  HH  :  MM  "
+	// "  ▼     ▼  "
+	hrStr := fmt.Sprintf("%02d", hr)
+	minStr := fmt.Sprintf("%02d", min)
+
+	line1 := fmt.Sprintf("  %s     %s", upSty.Render("▲"), upSty.Render("▲"))
+	line2 := fmt.Sprintf("  %s %s %s", hrSty.Render(hrStr), sepSty.Render(":"), minSty.Render(minStr))
+	line3 := fmt.Sprintf("  %s     %s", downSty.Render("▼"), downSty.Render("▼"))
+
+	return strings.Join([]string{line1, line2, line3}, "\n")
+}
+
+func (m *createEventModel) renderSubmit() string {
+	focused := m.focused == ceSubmit
+	if focused {
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color(styles.ColorBlack)).
+			Background(lipgloss.Color(styles.ColorSecondaryFg)).
+			Bold(true).
+			Padding(0, 2).
+			Render("  Create Event  ")
+	}
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color(styles.ColorBorder)).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("238")).
+		Padding(0, 2).
+		Render("  Create Event  ")
+}
+
+func (m *createEventModel) renderHelp() string {
+	key := lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorSecondaryBorder))
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
+
+	base := key.Render("tab") + dim.Render("/") + key.Render("enter") + dim.Render(" next · ") +
+		key.Render("shift+tab") + dim.Render(" prev · ") +
+		key.Render("esc") + dim.Render(" cancel")
+
+	var extra string
+	switch m.focused {
+	case ceStartCal, ceEndCal:
+		extra = dim.Render("  ·  ") +
+			key.Render("←→") + dim.Render(" day · ") +
+			key.Render("↑↓") + dim.Render(" week · ") +
+			key.Render("[]") + dim.Render(" month")
+	case ceStartHr, ceEndHr, ceStartMin, ceEndMin:
+		extra = dim.Render("  ·  ") + key.Render("↑↓") + dim.Render(" change value")
+	case ceCalendar:
+		extra = dim.Render("  ·  ") + key.Render("↑↓") + dim.Render(" cycle calendars")
+	}
+
+	return base + extra
 }

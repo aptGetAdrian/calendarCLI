@@ -36,3 +36,8 @@ token.json
 # Logs
 logs/
 *.log
+
+
+# Claude
+CLAUDE.md
+.claude
