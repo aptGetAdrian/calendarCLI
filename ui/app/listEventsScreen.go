@@ -27,13 +27,29 @@ const (
 
 const leTitleBarH = 4
 
+// ─── color palette ────────────────────────────────────────────────────────────
+
+const eventFg = "#e8f3ff"
+
+var eventPalette = []string{
+	"#1a5494", // steel blue
+	"#2d7a3a", // forest green
+	"#7a2020", // dark red
+	"#6a2d8b", // purple
+	"#8b6a00", // dark gold
+	"#1a7070", // teal
+	"#8b4500", // burnt orange
+	"#2a4a8b", // navy
+}
+
 // ─── event data ───────────────────────────────────────────────────────────────
 
 type leEvent struct {
 	title    string
-	startDay int // 0-6 offset from weekStart (Mon=0)
-	startHr  int // 0-23
-	endHr    int // exclusive end hour (1-24); event spans rows startHr..endHr-1
+	startDay int    // 0-6 offset from weekStart (Mon=0)
+	startHr  int    // 0-23
+	endHr    int    // exclusive end hour (1-24); event spans rows startHr..endHr-1
+	color    string // background color from palette
 }
 
 type fetchedEventsMsg struct {
@@ -94,11 +110,15 @@ func buildLeEvents(raw []*gcalendar.Event, weekStart time.Time) []leEvent {
 			endHr = startHr + 1
 		}
 
+		// Assign a color by cycling through the palette based on insertion order.
+		color := eventPalette[len(result)%len(eventPalette)]
+
 		result = append(result, leEvent{
 			title:    e.Summary,
 			startDay: dayOffset,
 			startHr:  startHr,
 			endHr:    endHr,
+			color:    color,
 		})
 	}
 	return result
@@ -155,7 +175,7 @@ func newListEventsModel(service *calendar.Service, state AppState, width, height
 		calOpts:    calOpts,
 		calIdx:     calIdx,
 		weekStart:  mondayOf(time.Now()),
-		scrollHour: 8,
+		scrollHour: 0,
 		loading:    true,
 	}
 }
@@ -249,10 +269,10 @@ func (m *listEventsModel) fetchEvents() tea.Cmd {
 	}
 }
 
-// ─── event lookup helpers ─────────────────────────────────────────────────────
+// ─── event lookup ─────────────────────────────────────────────────────────────
 
-// eventsAt returns every event that covers (day, hour), sorted stably by
-// start time then title so relative positions stay consistent across rows.
+// eventsAt returns every event covering (day, hour), sorted stably so relative
+// left-to-right positions stay consistent across rows.
 func (m *listEventsModel) eventsAt(day, hour int) []leEvent {
 	var out []leEvent
 	for _, e := range m.events {
@@ -271,13 +291,15 @@ func (m *listEventsModel) eventsAt(day, hour int) []leEvent {
 
 // ─── layout helpers ───────────────────────────────────────────────────────────
 
-func (m *listEventsModel) gridRows() int {
+// visibleHours returns how many full hour slots fit in the grid area.
+// Each hour slot takes 2 terminal rows (content + separator line).
+func (m *listEventsModel) visibleHours() int {
 	// blank + controls + blank + header + blank + help = 6 fixed lines
-	r := m.height - leTitleBarH - 6
-	if r < 1 {
+	total := m.height - leTitleBarH - 6
+	if total < 2 {
 		return 1
 	}
-	return r
+	return total / 2
 }
 
 func (m *listEventsModel) colWidth() int {
@@ -425,11 +447,6 @@ func (m *listEventsModel) renderDayHeader() string {
 
 // ─── schedule grid ────────────────────────────────────────────────────────────
 
-const (
-	eventBg = "#1a5494" // deep blue block background
-	eventFg = "#e8f3ff" // near-white text on event
-)
-
 // truncRunes truncates s to at most n runes.
 func truncRunes(s string, n int) string {
 	r := []rune(s)
@@ -439,67 +456,94 @@ func truncRunes(s string, n int) string {
 	return s
 }
 
+// renderEventCell builds the colored sub-columns for a single (day, hour) cell.
+// showTitle controls whether to render the event title (true for the first
+// visible row of the event block, false for all continuation rows).
+func (m *listEventsModel) renderEventCell(evts []leEvent, innerW, h int, showTitle bool) string {
+	n := len(evts)
+	subW := innerW / n
+	if subW < 1 {
+		subW = 1
+	}
+	var sb strings.Builder
+	for idx, e := range evts {
+		w := subW
+		if idx == n-1 {
+			w = innerW - subW*(n-1) // last slot absorbs rounding remainder
+		}
+		sty := lipgloss.NewStyle().
+			Background(lipgloss.Color(e.color)).
+			Foreground(lipgloss.Color(eventFg)).
+			Width(w)
+		isFirstVisible := e.startHr == h || (e.startHr < m.scrollHour && h == m.scrollHour)
+		if showTitle && isFirstVisible {
+			sb.WriteString(sty.Bold(true).Render(truncRunes(e.title, w)))
+		} else {
+			sb.WriteString(sty.Render(""))
+		}
+	}
+	return sb.String()
+}
+
 func (m *listEventsModel) renderGrid() string {
 	timeSty := lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorBorder))
+	timeEmptySty := lipgloss.NewStyle().Foreground(lipgloss.Color("236"))
 	sepSty := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
-	eventBase := lipgloss.NewStyle().
-		Background(lipgloss.Color(eventBg)).
-		Foreground(lipgloss.Color(eventFg))
+	hourLineSty := lipgloss.NewStyle().Foreground(lipgloss.Color("236"))
 
 	colW := m.colWidth()
-	maxRows := m.gridRows()
-
-	// innerW: full column width minus 1 char for the │ separator
 	innerW := colW - 1
 	if innerW < 1 {
 		innerW = 1
 	}
 
+	visHours := m.visibleHours()
 	var rows []string
-	for i := 0; i < maxRows; i++ {
+
+	for i := 0; i < visHours; i++ {
 		h := m.scrollHour + i
 		if h >= 24 {
-			rows = append(rows, "")
+			// Pad remaining rows with blank lines to keep layout stable.
+			rows = append(rows, "", "")
 			continue
 		}
 
-		row := timeSty.Render(fmt.Sprintf("%02d:00 ", h))
+		// ── content row ──────────────────────────────────────────────────────
+		contentRow := timeSty.Render(fmt.Sprintf("%02d:00 ", h))
 		for d := 0; d < 7; d++ {
 			evts := m.eventsAt(d, h)
 			var cell string
-
 			if len(evts) == 0 {
 				cell = strings.Repeat(" ", innerW)
 			} else {
-				// Split column into equal sub-columns, one per concurrent event.
-				n := len(evts)
-				subW := innerW / n
-				if subW < 1 {
-					subW = 1
-				}
-				var sb strings.Builder
-				for idx, e := range evts {
-					w := subW
-					if idx == n-1 {
-						w = innerW - subW*(n-1) // last slot absorbs rounding remainder
-					}
-					sty := eventBase.Width(w)
-					if e.startHr == h {
-						sb.WriteString(sty.Bold(true).Render(truncRunes(e.title, w)))
-					} else {
-						sb.WriteString(sty.Render(""))
-					}
-				}
-				cell = sb.String()
+				cell = m.renderEventCell(evts, innerW, h, true)
 			}
-
 			if d < 6 {
 				cell += sepSty.Render("│")
 			}
-			row += cell
+			contentRow += cell
 		}
-		rows = append(rows, row)
+		rows = append(rows, contentRow)
+
+		// ── separator row (dim horizontal lines between hours) ────────────────
+		sepRow := timeEmptySty.Render(strings.Repeat(" ", 6))
+		for d := 0; d < 7; d++ {
+			evts := m.eventsAt(d, h)
+			var cell string
+			if len(evts) == 0 {
+				cell = hourLineSty.Render(strings.Repeat("─", innerW))
+			} else {
+				// Keep event color block continuous through the separator row.
+				cell = m.renderEventCell(evts, innerW, h, false)
+			}
+			if d < 6 {
+				cell += sepSty.Render("│")
+			}
+			sepRow += cell
+		}
+		rows = append(rows, sepRow)
 	}
+
 	return strings.Join(rows, "\n")
 }
 
@@ -517,8 +561,8 @@ func (m *listEventsModel) renderHelp() string {
 	if m.scrollHour > 0 {
 		base += dim.Render(fmt.Sprintf("  [↑ %02d:00]", m.scrollHour))
 	}
-	if m.scrollHour+m.gridRows() < 24 {
-		base += dim.Render(fmt.Sprintf("  [↓ %02d:00]", m.scrollHour+m.gridRows()))
+	if m.scrollHour+m.visibleHours() < 24 {
+		base += dim.Render(fmt.Sprintf("  [↓ %02d:00]", m.scrollHour+m.visibleHours()))
 	}
 	return base
 }
