@@ -24,6 +24,20 @@ func (s *Service) ListUpcoming(max int) ([]*gcalendar.Event, error) {
 	return events.Items, nil
 }
 
+func (s *Service) ListEventsForCalendarInRange(calID string, start, end time.Time) ([]*gcalendar.Event, error) {
+	events, err := s.client.Events.List(calID).
+		ShowDeleted(false).
+		SingleEvents(true).
+		TimeMin(start.Format(time.RFC3339)).
+		TimeMax(end.Format(time.RFC3339)).
+		OrderBy("startTime").
+		Do()
+	if err != nil {
+		return nil, err
+	}
+	return events.Items, nil
+}
+
 func (s *Service) CreateEvent(
 	calendarID, title, location, description string,
 	start, end time.Time) (*gcalendar.Event, error) {
