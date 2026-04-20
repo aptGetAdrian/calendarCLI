@@ -428,27 +428,42 @@ func (m *listEventsModel) renderDayHeader() string {
 // ─── schedule grid ────────────────────────────────────────────────────────────
 
 const (
-	eventColor       = "#5f9fd7" // steel blue for event starts
-	eventContColor   = "#3d6e8a" // dimmer blue for event continuation
-	eventStartPrefix = "▶ "
-	eventContPrefix  = "  │ "
+	eventBg   = "#1a5494" // deep blue block background
+	eventFg   = "#e8f3ff" // near-white text on event
+	eventContBg = "#163f70" // slightly darker for continuation rows
 )
+
+// truncRunes truncates s to at most n runes.
+func truncRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n])
+	}
+	return s
+}
 
 func (m *listEventsModel) renderGrid() string {
 	timeSty := lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorBorder))
 	sepSty := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
-	eventSty := lipgloss.NewStyle().Foreground(lipgloss.Color(eventColor)).Bold(true)
-	contSty := lipgloss.NewStyle().Foreground(lipgloss.Color(eventContColor))
-	emptySty := lipgloss.NewStyle().Foreground(lipgloss.Color("236"))
 
 	colW := m.colWidth()
 	maxRows := m.gridRows()
 
-	// inner content width: colW minus 1 for the separator
+	// inner width: full column minus 1 char for the │ separator
 	innerW := colW - 1
 	if innerW < 1 {
 		innerW = 1
 	}
+
+	startSty := lipgloss.NewStyle().
+		Background(lipgloss.Color(eventBg)).
+		Foreground(lipgloss.Color(eventFg)).
+		Bold(true).
+		Width(innerW)
+
+	contSty := lipgloss.NewStyle().
+		Background(lipgloss.Color(eventContBg)).
+		Width(innerW)
 
 	var rows []string
 	for i := 0; i < maxRows; i++ {
@@ -462,28 +477,20 @@ func (m *listEventsModel) renderGrid() string {
 		for d := 0; d < 7; d++ {
 			var cell string
 			evts := m.eventsStartingAt(d, h)
-			if len(evts) > 0 {
+			switch {
+			case len(evts) > 0:
 				e := evts[0]
-				label := eventStartPrefix + e.title
-				if len(label) > innerW {
-					label = label[:innerW]
-				} else {
-					label = fmt.Sprintf("%-*s", innerW, label)
+				label := truncRunes(e.title, innerW)
+				if len(evts) > 1 && innerW > 4 {
+					// leave room for "+N" suffix
+					suffix := fmt.Sprintf("+%d", len(evts)-1)
+					label = truncRunes(e.title, innerW-len(suffix)) + suffix
 				}
-				cell = eventSty.Render(label)
-				if len(evts) > 1 {
-					// show count indicator in last char
-					cell = eventSty.Render(fmt.Sprintf("%-*s+%d", innerW-2, eventStartPrefix+e.title, len(evts)-1))
-				}
-			} else if m.continuesAt(d, h) {
-				bar := eventContPrefix
-				rest := strings.Repeat("─", innerW-len([]rune(eventContPrefix)))
-				if rest == "" {
-					rest = ""
-				}
-				cell = contSty.Render(fmt.Sprintf("%-*s", innerW, bar+rest))
-			} else {
-				cell = emptySty.Render(strings.Repeat(" ", innerW))
+				cell = startSty.Render(label)
+			case m.continuesAt(d, h):
+				cell = contSty.Render("")
+			default:
+				cell = strings.Repeat(" ", innerW)
 			}
 
 			if d < 6 {
