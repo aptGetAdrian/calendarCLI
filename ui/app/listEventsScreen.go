@@ -58,13 +58,20 @@ type fetchedEventsMsg struct {
 }
 
 // buildLeEvents converts raw API events into grid-positioned leEvents.
+// Multi-day events are split into one leEvent per day they cover within the week.
 func buildLeEvents(raw []*gcalendar.Event, weekStart time.Time) []leEvent {
+	weekDay0 := time.Date(weekStart.Year(), weekStart.Month(), weekStart.Day(), 0, 0, 0, 0, time.Local)
+	weekDay7 := weekDay0.AddDate(0, 0, 7)
+
 	var result []leEvent
+	colorIdx := 0 // increments per raw event so all segments share one color
+
 	for _, e := range raw {
 		if e.Start == nil || e.Summary == "" {
 			continue
 		}
 
+		// Parse start time (timed or all-day).
 		var startT time.Time
 		if e.Start.DateTime != "" {
 			t, err := time.Parse(time.RFC3339, e.Start.DateTime)
@@ -73,53 +80,83 @@ func buildLeEvents(raw []*gcalendar.Event, weekStart time.Time) []leEvent {
 			}
 			startT = t.Local()
 		} else if e.Start.Date != "" {
-			// all-day: skip for now
-			continue
+			t, err := time.Parse("2006-01-02", e.Start.Date)
+			if err != nil {
+				continue
+			}
+			startT = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
 		} else {
 			continue
 		}
 
+		// Parse end time (timed or all-day; Google's all-day End.Date is exclusive).
 		var endT time.Time
-		if e.End != nil && e.End.DateTime != "" {
-			t, err := time.Parse(time.RFC3339, e.End.DateTime)
-			if err == nil {
-				endT = t.Local()
+		if e.End != nil {
+			if e.End.DateTime != "" {
+				t, err := time.Parse(time.RFC3339, e.End.DateTime)
+				if err == nil {
+					endT = t.Local()
+				}
+			} else if e.End.Date != "" {
+				t, err := time.Parse("2006-01-02", e.End.Date)
+				if err == nil {
+					endT = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
+				}
 			}
 		}
+		if endT.IsZero() {
+			endT = startT.Add(time.Hour)
+		}
 
-		// day offset relative to weekStart
-		ws := time.Date(weekStart.Year(), weekStart.Month(), weekStart.Day(), 0, 0, 0, 0, time.Local)
-		sd := time.Date(startT.Year(), startT.Month(), startT.Day(), 0, 0, 0, 0, time.Local)
-		dayOffset := int(sd.Sub(ws).Hours() / 24)
-		if dayOffset < 0 || dayOffset > 6 {
+		// Skip events entirely outside this week.
+		if !endT.After(weekDay0) || !startT.Before(weekDay7) {
 			continue
 		}
 
-		startHr := startT.Hour()
-		endHr := startHr + 1 // default: 1-hour block
-		if !endT.IsZero() {
-			endHr = endT.Hour()
-			if endT.Minute() > 0 {
-				endHr++
+		color := eventPalette[colorIdx%len(eventPalette)]
+		colorIdx++
+
+		// Emit one leEvent segment for each day of the week this event overlaps.
+		for d := 0; d < 7; d++ {
+			dayStart := weekDay0.AddDate(0, 0, d)
+			dayEnd := dayStart.AddDate(0, 0, 1)
+
+			// Skip days the event doesn't touch.
+			if !startT.Before(dayEnd) || !endT.After(dayStart) {
+				continue
 			}
-		}
-		if endHr > 24 {
-			endHr = 24
-		}
-		if endHr <= startHr {
-			endHr = startHr + 1
-		}
 
-		// Assign a color by cycling through the palette based on insertion order.
-		color := eventPalette[len(result)%len(eventPalette)]
+			// Clamp start/end to this day's bounds.
+			var startHr, endHr int
+			if !startT.Before(dayStart) {
+				startHr = startT.Hour()
+			} else {
+				startHr = 0
+			}
 
-		result = append(result, leEvent{
-			title:    e.Summary,
-			startDay: dayOffset,
-			startHr:  startHr,
-			endHr:    endHr,
-			color:    color,
-		})
+			if endT.Before(dayEnd) || endT.Equal(dayEnd) {
+				endHr = endT.Hour()
+				if endT.Minute() > 0 {
+					endHr++
+				}
+			} else {
+				endHr = 24
+			}
+			if endHr > 24 {
+				endHr = 24
+			}
+			if endHr <= startHr {
+				endHr = startHr + 1
+			}
+
+			result = append(result, leEvent{
+				title:    e.Summary,
+				startDay: d,
+				startHr:  startHr,
+				endHr:    endHr,
+				color:    color,
+			})
+		}
 	}
 	return result
 }
