@@ -121,6 +121,11 @@ func (m *RootModel) handleNavigation(msg NavigateTo, logger *logger.Logger) (tea
 		m.activeScreen = screenCreateEvent
 		m.child = child
 		return m, child.Init()
+	case ui.ListEventsScreen:
+		child := newListEventsModel(m.service, m.state, m.contentWidth(), m.contentHeight(), logger)
+		m.activeScreen = screenListEvents
+		m.child = child
+		return m, child.Init()
 	}
 	return m, nil
 }
