@@ -23,4 +23,5 @@ const (
 	ListEventsScreen
 	CreateEventScreen
 	AddBirthdayScreen
+	TodoScreen
 )

@@ -18,6 +18,7 @@ const (
 	screenSelectCalendar ui.Screen = ui.SelectCalendarScreen
 	screenListEvents     ui.Screen = ui.ListEventsScreen
 	screenCreateEvent    ui.Screen = ui.CreateEventScreen
+	screenTodo           ui.Screen = ui.TodoScreen
 )
 
 type AppState struct {

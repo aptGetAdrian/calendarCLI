@@ -16,6 +16,11 @@
       "action": "CREATE_EVENT"
     },
     {
+      "title": "To-Do List",
+      "description": "View and manage your personal to-do list.",
+      "action": "TODO_LIST"
+    },
+    {
       "title": "Exit",
       "description": "Close the application.",
       "action": "EXIT_APP"
