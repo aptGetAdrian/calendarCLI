@@ -14,11 +14,10 @@ import (
 type screen string
 
 const (
-	screenMainMenu       ui.Screen = ui.MainMenuScreen
-	screenSelectCalendar ui.Screen = ui.SelectCalendarScreen
-	screenListEvents     ui.Screen = ui.ListEventsScreen
-	screenCreateEvent    ui.Screen = ui.CreateEventScreen
-	screenTodo           ui.Screen = ui.TodoScreen
+	screenMainMenu   ui.Screen = ui.MainMenuScreen
+	screenListEvents ui.Screen = ui.ListEventsScreen
+	screenCreateEvent ui.Screen = ui.CreateEventScreen
+	screenTodo       ui.Screen = ui.TodoScreen
 )
 
 type AppState struct {
@@ -79,12 +78,6 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case NavigateTo:
 		return m.handleNavigation(msg, m.logger)
 
-	case calendarSelectedMsg:
-		m.state.SelectedCalendar = msg.calendarName
-		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight(), m.logger)
-		m.activeScreen = screenMainMenu
-		m.child = child
-		return m, child.Init()
 	case eventCreatedMsg:
 		// event saved — go back to main menu
 		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight(), m.logger)
@@ -103,12 +96,30 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+const minTermWidth = 80
+const minTermHeight = 26
+
 func (m *RootModel) View() string {
+	if m.termWidth < minTermWidth || m.termHeight < minTermHeight {
+		msg := fmt.Sprintf(
+			"Terminal too small (%dx%d). Please resize to at least %dx%d.",
+			m.termWidth, m.termHeight, minTermWidth, minTermHeight,
+		)
+		return lipgloss.NewStyle().
+			Padding(2, 4).
+			Foreground(lipgloss.Color(styles.ColorWarning)).
+			Render(msg)
+	}
+
 	statusBar := buildStatusBar(&m.state, m.contentWidth())
+
+	childView := lipgloss.NewStyle().
+		Height(m.contentHeight()).
+		Render(m.child.View())
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
-		m.child.View(),
+		childView,
 		statusBar,
 	)
 

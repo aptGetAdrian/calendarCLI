@@ -53,8 +53,6 @@ func (m *mainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch selected.Action {
 			case "EXIT_APP":
 				return m, tea.Quit
-			case "SELECT_CALENDAR":
-				return m, func() tea.Msg { return NavigateTo{Screen: ui.SelectCalendarScreen} }
 			case "LIST_EVENTS":
 				return m, func() tea.Msg { return NavigateTo{Screen: ui.ListEventsScreen} }
 			case "CREATE_EVENT":

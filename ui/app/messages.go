@@ -6,10 +6,6 @@ type NavigateTo struct {
 	Screen ui.Screen
 }
 
-type calendarSelectedMsg struct {
-	calendarName string
-}
-
 type eventCreatedMsg struct{}
 
 type menuItemHighlightedMsg struct {

@@ -45,10 +45,9 @@ func buildStatusLine(state *AppState) string {
 		calCount = styles.InfoText.Render(fmt.Sprintf("%d calendars", state.CalendarCount))
 	}
 
-	selected := styles.WarningText.Render("Selected calendar: " + state.SelectedCalendar)
 	selectedItem := styles.AccentText.Render("Selected menu item: " + state.SelectedMenuItem)
 
-	return fmt.Sprintf("%s • %s • %s • %s", authText, calCount, selected, selectedItem)
+	return fmt.Sprintf("%s • %s • %s", authText, calCount, selectedItem)
 }
 
 func buildStatusBar(state *AppState, width int) string {
@@ -104,11 +103,6 @@ func (m *RootModel) contentHeight() int {
 
 func (m *RootModel) handleNavigation(msg NavigateTo, logger *logger.Logger) (tea.Model, tea.Cmd) {
 	switch ui.Screen(msg.Screen) {
-	case ui.SelectCalendarScreen:
-		child := newSelectCalendarModel(m.service, m.state, m.contentWidth(), m.contentHeight(), logger)
-		m.activeScreen = screenSelectCalendar
-		m.child = child
-		return m, child.Init()
 	case ui.MainMenuScreen:
 		child := newMainMenuModel(m.state, m.contentWidth(), m.contentHeight(), logger)
 		m.activeScreen = screenMainMenu

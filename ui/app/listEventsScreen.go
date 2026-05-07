@@ -29,17 +29,17 @@ const leTitleBarH = 4
 
 // ─── color palette ────────────────────────────────────────────────────────────
 
-const eventFg = "#e8f3ff"
+const eventFg = "#d4cfc8"
 
 var eventPalette = []string{
-	"#1a5494", // steel blue
-	"#2d7a3a", // forest green
-	"#7a2020", // dark red
-	"#6a2d8b", // purple
-	"#8b6a00", // dark gold
-	"#1a7070", // teal
-	"#8b4500", // burnt orange
-	"#2a4a8b", // navy
+	"#3b5a4a", // faded sage
+	"#4a4a2a", // dusty olive
+	"#4a3a28", // warm umber
+	"#2a3f4a", // muted slate
+	"#4a3048", // faded mauve
+	"#2e4a3a", // washed moss
+	"#4a4030", // aged amber
+	"#333a4a", // dim denim
 }
 
 // ─── event data ───────────────────────────────────────────────────────────────
@@ -67,8 +67,12 @@ func buildLeEvents(raw []*gcalendar.Event, weekStart time.Time) []leEvent {
 	colorIdx := 0 // increments per raw event so all segments share one color
 
 	for _, e := range raw {
-		if e.Start == nil || e.Summary == "" {
+		if e.Start == nil {
 			continue
+		}
+		title := e.Summary
+		if title == "" {
+			title = "(No title)"
 		}
 
 		// Parse start time (timed or all-day).
@@ -150,7 +154,7 @@ func buildLeEvents(raw []*gcalendar.Event, weekStart time.Time) []leEvent {
 			}
 
 			result = append(result, leEvent{
-				title:    e.Summary,
+				title:    title,
 				startDay: d,
 				startHr:  startHr,
 				endHr:    endHr,

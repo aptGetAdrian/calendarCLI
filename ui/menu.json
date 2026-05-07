@@ -1,11 +1,6 @@
 {
   "main_menu_items": [
     {
-      "title": "Select calendar",
-      "description": "Choose a calendar from your Google calendars.\nThe default one is the primary calendar.",
-      "action": "SELECT_CALENDAR"
-    },
-    {
       "title": "List events",
       "description": "List all events in your chosen calendar.",
       "action": "LIST_EVENTS"

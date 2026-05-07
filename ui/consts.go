@@ -19,7 +19,6 @@ type Screen int
 
 const (
 	MainMenuScreen Screen = iota
-	SelectCalendarScreen
 	ListEventsScreen
 	CreateEventScreen
 	AddBirthdayScreen

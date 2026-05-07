@@ -1,17 +1,7 @@
 [
   {
-    "id": "1778087193951814708",
-    "title": "prosnje",
-    "description": "napisi 3 prosnje za delo"
-  },
-  {
-    "id": "1778087212559522863",
-    "title": "trgovina",
-    "description": "idi po mleko v trgovino"
-  },
-  {
-    "id": "1778087330194541749",
-    "title": "popravi to do screen estetsko",
-    "description": "status bar ni doleh\ndescription je visje kak list\nlehko so malo lepse barve, vecji razmak med entries v seznami\nko dodajes entry, je prelomna crta ne v isti ravnini"
+    "id": "1778153158144459964",
+    "title": "add birthday functionality",
+    "description": "add a birthday functionality to the menu\nbasically, it adds an entry to the birthday calendar -- a reocurring event every year at the same time"
   }
 ]

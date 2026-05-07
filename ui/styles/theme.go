@@ -38,7 +38,6 @@ const (
 var (
 	SuccessText = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSuccess))
 	InfoText    = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorInfo))
-	WarningText = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
 	AccentText  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorAccent))
 
 	StatusBarBorder = lipgloss.NewStyle().
