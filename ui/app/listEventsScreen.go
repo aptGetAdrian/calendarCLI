@@ -138,7 +138,7 @@ func buildLeEvents(raw []*gcalendar.Event, weekStart time.Time) []leEvent {
 				startHr = 0
 			}
 
-			if endT.Before(dayEnd) || endT.Equal(dayEnd) {
+			if endT.Before(dayEnd) {
 				endHr = endT.Hour()
 				if endT.Minute() > 0 {
 					endHr++
