@@ -197,6 +197,9 @@ func newListEventsModel(service *calendar.Service, state AppState, width, height
 			calOpts = append(calOpts, calOpt{c.Summary, c.Id})
 		}
 	}
+	if exists, err := service.ExistBirthday(); err == nil && exists {
+		calOpts = append(calOpts, calOpt{"Birthdays", "birthdays"})
+	}
 
 	calIdx := 0
 	for i, o := range calOpts {
@@ -301,7 +304,13 @@ func (m *listEventsModel) fetchEvents() tea.Cmd {
 	log := m.logger
 	return func() tea.Msg {
 		weekEnd := weekStart.AddDate(0, 0, 7)
-		raw, err := svc.ListEventsForCalendarInRange(calID, weekStart, weekEnd)
+		var raw []*gcalendar.Event
+		var err error
+		if calID == "birthdays" {
+			raw, err = svc.ListBirthdayEventsInRange(weekStart, weekEnd)
+		} else {
+			raw, err = svc.ListEventsForCalendarInRange(calID, weekStart, weekEnd)
+		}
 		if err != nil {
 			log.Error("fetchEvents: %v", err)
 			return fetchedEventsMsg{err: err}

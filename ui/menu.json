@@ -11,6 +11,11 @@
       "action": "CREATE_EVENT"
     },
     {
+      "title": "Add Birthday",
+      "description": "Add a yearly birthday reminder to your calendar.",
+      "action": "ADD_BIRTHDAY"
+    },
+    {
       "title": "To-Do List",
       "description": "View and manage your personal to-do list.",
       "action": "TODO_LIST"

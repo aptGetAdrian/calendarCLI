@@ -14,10 +14,11 @@ import (
 type screen string
 
 const (
-	screenMainMenu   ui.Screen = ui.MainMenuScreen
-	screenListEvents ui.Screen = ui.ListEventsScreen
+	screenMainMenu    ui.Screen = ui.MainMenuScreen
+	screenListEvents  ui.Screen = ui.ListEventsScreen
 	screenCreateEvent ui.Screen = ui.CreateEventScreen
-	screenTodo       ui.Screen = ui.TodoScreen
+	screenAddBirthday ui.Screen = ui.AddBirthdayScreen
+	screenTodo        ui.Screen = ui.TodoScreen
 )
 
 type AppState struct {

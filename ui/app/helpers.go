@@ -120,6 +120,11 @@ func (m *RootModel) handleNavigation(msg NavigateTo, logger *logger.Logger) (tea
 		m.activeScreen = screenListEvents
 		m.child = child
 		return m, child.Init()
+	case ui.AddBirthdayScreen:
+		child := newAddBirthdayScreenModel(m.service, m.state, m.contentWidth(), m.contentHeight(), logger)
+		m.activeScreen = screenAddBirthday
+		m.child = child
+		return m, child.Init()
 	case ui.TodoScreen:
 		child := newTodoScreenModel(m.state, m.contentWidth(), m.contentHeight(), logger)
 		m.activeScreen = screenTodo
