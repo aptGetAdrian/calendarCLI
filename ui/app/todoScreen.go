@@ -18,6 +18,7 @@ type todoMode int
 const (
 	todoListMode todoMode = iota
 	todoAddMode
+	todoEditMode
 )
 
 type todoScreenModel struct {
@@ -27,7 +28,10 @@ type todoScreenModel struct {
 	mode        todoMode
 	titleInput  textinput.Model
 	descInput   textarea.Model
-	activeField int // 0 = title, 1 = description
+	activeField int // 0 = title, 1 = description (add/edit form)
+	activePanel int // 0 = left list, 1 = right description
+	listScroll  int
+	descScroll  int
 	width       int
 	height      int
 	logger      *logger.Logger
@@ -80,6 +84,64 @@ func (m *todoScreenModel) resizeInputs() {
 	m.descInput.SetHeight(descH)
 }
 
+// panelH is the height available for the two panels (total height minus the hint bar).
+func (m *todoScreenModel) panelH() int {
+	return m.height - 1
+}
+
+func (m *todoScreenModel) titleAreaH() int {
+	return lipgloss.Height(styles.SecondaryMenuTtitle().Render("To-Do List")) + 1
+}
+
+// visibleListCount returns how many list rows fit in the left panel.
+func (m *todoScreenModel) visibleListCount() int {
+	v := m.panelH() - m.titleAreaH()
+	if v < 1 {
+		return 1
+	}
+	return v
+}
+
+// visibleDescCount returns how many description lines fit in the right panel.
+func (m *todoScreenModel) visibleDescCount() int {
+	// right panel has PaddingTop(titleAreaH) + "Description" label + blank line
+	v := m.panelH() - m.titleAreaH() - 2
+	if v < 1 {
+		return 1
+	}
+	return v
+}
+
+func (m *todoScreenModel) clampListScroll() {
+	vis := m.visibleListCount()
+	if m.cursor < m.listScroll {
+		m.listScroll = m.cursor
+	}
+	if m.cursor >= m.listScroll+vis {
+		m.listScroll = m.cursor - vis + 1
+	}
+	if m.listScroll < 0 {
+		m.listScroll = 0
+	}
+}
+
+// wrappedDescLines word-wraps the current todo's description and returns its lines.
+func (m *todoScreenModel) wrappedDescLines() []string {
+	if len(m.todos) == 0 {
+		return nil
+	}
+	desc := m.todos[m.cursor].Description
+	if desc == "" {
+		return nil
+	}
+	rightW := m.width - m.width/2 - 4
+	if rightW < 10 {
+		rightW = 10
+	}
+	rendered := lipgloss.NewStyle().Width(rightW).Render(desc)
+	return strings.Split(rendered, "\n")
+}
+
 func (m *todoScreenModel) Init() tea.Cmd {
 	return textinput.Blink
 }
@@ -101,18 +163,60 @@ func (m *todoScreenModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *todoScreenModel) enterEditMode() tea.Cmd {
+	if len(m.todos) == 0 {
+		return nil
+	}
+	todo := m.todos[m.cursor]
+	m.mode = todoEditMode
+	m.activeField = 0
+	m.titleInput.SetValue(todo.Title)
+	m.descInput.SetValue(todo.Description)
+	m.titleInput.Focus()
+	m.descInput.Blur()
+	return textinput.Blink
+}
+
 func (m *todoScreenModel) updateListMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		return m, func() tea.Msg { return NavigateTo{Screen: ui.MainMenuScreen} }
+
+	case "tab":
+		if m.activePanel == 0 {
+			m.activePanel = 1
+		} else {
+			m.activePanel = 0
+		}
+
 	case "up", "k":
-		if m.cursor > 0 {
-			m.cursor--
+		if m.activePanel == 0 {
+			if m.cursor > 0 {
+				m.cursor--
+				m.descScroll = 0
+			}
+			m.clampListScroll()
+		} else {
+			if m.descScroll > 0 {
+				m.descScroll--
+			}
 		}
+
 	case "down", "j":
-		if m.cursor < len(m.todos)-1 {
-			m.cursor++
+		if m.activePanel == 0 {
+			if m.cursor < len(m.todos)-1 {
+				m.cursor++
+				m.descScroll = 0
+			}
+			m.clampListScroll()
+		} else {
+			lines := m.wrappedDescLines()
+			vis := m.visibleDescCount()
+			if m.descScroll+vis < len(lines) {
+				m.descScroll++
+			}
 		}
+
 	case "a":
 		m.mode = todoAddMode
 		m.activeField = 0
@@ -121,6 +225,10 @@ func (m *todoScreenModel) updateListMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.titleInput.Focus()
 		m.descInput.Blur()
 		return m, textinput.Blink
+
+	case "e":
+		return m, m.enterEditMode()
+
 	case "d":
 		if len(m.todos) > 0 {
 			todos, err := calendar.DeleteTodo(m.todos[m.cursor].ID)
@@ -131,6 +239,8 @@ func (m *todoScreenModel) updateListMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if m.cursor >= len(m.todos) && m.cursor > 0 {
 					m.cursor--
 				}
+				m.descScroll = 0
+				m.clampListScroll()
 			}
 		}
 	}
@@ -167,12 +277,24 @@ func (m *todoScreenModel) updateAddMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		desc := strings.TrimSpace(m.descInput.Value())
-		todos, err := calendar.AddTodo(title, desc)
-		if err != nil {
-			m.logger.Error("Failed to save todo: %v", err)
+		if m.mode == todoEditMode {
+			todos, err := calendar.UpdateTodo(m.todos[m.cursor].ID, title, desc)
+			if err != nil {
+				m.logger.Error("Failed to update todo: %v", err)
+			} else {
+				m.todos = todos
+				m.descScroll = 0
+			}
 		} else {
-			m.todos = todos
-			m.cursor = len(m.todos) - 1
+			todos, err := calendar.AddTodo(title, desc)
+			if err != nil {
+				m.logger.Error("Failed to save todo: %v", err)
+			} else {
+				m.todos = todos
+				m.cursor = len(m.todos) - 1
+				m.descScroll = 0
+				m.clampListScroll()
+			}
 		}
 		m.mode = todoListMode
 		return m, nil
@@ -195,7 +317,7 @@ func (m *todoScreenModel) View() string {
 	hintH := lipgloss.Height(hint)
 	panelH := m.height - hintH
 
-	titleH := lipgloss.Height(styles.SecondaryMenuTtitle().Render("To-Do List")) + 1
+	titleH := m.titleAreaH()
 
 	leftPanel := lipgloss.NewStyle().
 		Width(leftW).
@@ -232,9 +354,14 @@ func (m *todoScreenModel) View() string {
 
 func (m *todoScreenModel) renderHint() string {
 	var text string
-	if m.mode == todoListMode {
-		text = "↑↓/jk: navigate  a: add  d: delete  esc: back"
-	} else {
+	switch m.mode {
+	case todoListMode:
+		if m.activePanel == 1 {
+			text = "↑↓: scroll desc  tab: focus list  a: add  e: edit  d: delete  esc: back"
+		} else {
+			text = "↑↓: navigate  tab: focus desc  a: add  e: edit  d: delete  esc: back"
+		}
+	default:
 		text = "tab: switch field  ctrl+s: save  esc: cancel"
 	}
 	return lipgloss.NewStyle().
@@ -263,7 +390,15 @@ func (m *todoScreenModel) renderLeftPanel(width int) string {
 			Foreground(lipgloss.Color(styles.ColorBorder)).
 			Width(width)
 
-		for i, todo := range m.todos {
+		vis := m.visibleListCount()
+		start := m.listScroll
+		end := start + vis
+		if end > len(m.todos) {
+			end = len(m.todos)
+		}
+
+		for i := start; i < end; i++ {
+			todo := m.todos[i]
 			if i == m.cursor {
 				listLines.WriteString(selectedStyle.Render("▸ "+todo.Title) + "\n")
 			} else {
@@ -279,8 +414,8 @@ func (m *todoScreenModel) renderLeftPanel(width int) string {
 	)
 }
 
-func (m *todoScreenModel) renderRightPanel(width int) string {
-	if m.mode == todoAddMode {
+func (m *todoScreenModel) renderRightPanel(_ int) string {
+	if m.mode == todoAddMode || m.mode == todoEditMode {
 		return m.renderAddForm()
 	}
 
@@ -299,11 +434,17 @@ func (m *todoScreenModel) renderRightPanel(width int) string {
 		)
 	}
 
-	desc := m.todos[m.cursor].Description
-	if desc == "" {
+	lines := m.wrappedDescLines()
+	var desc string
+	if len(lines) == 0 {
 		desc = mutedStyle.Render("(no description)")
 	} else {
-		desc = mutedStyle.Width(width).Render(desc)
+		vis := m.visibleDescCount()
+		end := m.descScroll + vis
+		if end > len(lines) {
+			end = len(lines)
+		}
+		desc = mutedStyle.Render(strings.Join(lines[m.descScroll:end], "\n"))
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left,
@@ -314,10 +455,14 @@ func (m *todoScreenModel) renderRightPanel(width int) string {
 }
 
 func (m *todoScreenModel) renderAddForm() string {
+	formTitleText := "New To-Do"
+	if m.mode == todoEditMode {
+		formTitleText = "Edit To-Do"
+	}
 	formTitle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#f0d080")).
-		Render("New To-Do")
+		Render(formTitleText)
 
 	titleLabel := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(styles.ColorBorder)).

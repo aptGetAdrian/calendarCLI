@@ -41,3 +41,7 @@ logs/
 # Claude
 CLAUDE.md
 .claude
+
+
+# todo list
+todos.json

@@ -52,6 +52,21 @@ func AddTodo(title, description string) ([]Todo, error) {
 	return todos, saveTodos(todos)
 }
 
+func UpdateTodo(id, title, description string) ([]Todo, error) {
+	todos, err := LoadTodos()
+	if err != nil {
+		return nil, err
+	}
+	for i, t := range todos {
+		if t.ID == id {
+			todos[i].Title = title
+			todos[i].Description = description
+			break
+		}
+	}
+	return todos, saveTodos(todos)
+}
+
 func DeleteTodo(id string) ([]Todo, error) {
 	todos, err := LoadTodos()
 	if err != nil {
