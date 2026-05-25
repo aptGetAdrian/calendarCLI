@@ -615,19 +615,13 @@ func (m *createEventModel) View() string {
 		if m.height > 2 {
 			lines[2] = lipgloss.NewStyle().
 				PaddingLeft(4).
-				Foreground(lipgloss.Color(styles.ColorSecondaryFg)).
+				Foreground(lipgloss.Color(styles.ColorCreateEventFg)).
 				Render("Creating event...")
 		}
 		return strings.Join(lines, "\n")
 	}
 
-	titleBar := lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(styles.ColorSecondaryBorder)).
-		Padding(0, 2).Bold(true).
-		Foreground(lipgloss.Color(styles.ColorSecondaryFg)).
-		Background(lipgloss.Color(styles.ColorSecondaryBg)).
-		Render("Create Event")
+	titleBar := styles.CreateEventTtitle().Render("Create Event")
 
 	body := m.buildBody()
 	lines := strings.Split(body, "\n")

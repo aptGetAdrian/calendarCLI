@@ -90,7 +90,7 @@ func (m *todoScreenModel) panelH() int {
 }
 
 func (m *todoScreenModel) titleAreaH() int {
-	return lipgloss.Height(styles.SecondaryMenuTtitle().Render("To-Do List")) + 1
+	return lipgloss.Height(styles.TodoTtitle().Render("To-Do List")) + 1
 }
 
 // visibleListCount returns how many list rows fit in the left panel.
@@ -371,7 +371,7 @@ func (m *todoScreenModel) renderHint() string {
 }
 
 func (m *todoScreenModel) renderLeftPanel(width int) string {
-	title := styles.SecondaryMenuTtitle().Render("To-Do List")
+	title := styles.TodoTtitle().Render("To-Do List")
 
 	var listLines strings.Builder
 	if len(m.todos) == 0 {

@@ -363,13 +363,7 @@ func (m *listEventsModel) colWidth() int {
 // ─── View ─────────────────────────────────────────────────────────────────────
 
 func (m *listEventsModel) View() string {
-	titleBar := lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(styles.ColorSecondaryBorder)).
-		Padding(0, 2).Bold(true).
-		Foreground(lipgloss.Color(styles.ColorSecondaryFg)).
-		Background(lipgloss.Color(styles.ColorSecondaryBg)).
-		Render("List Events")
+	titleBar := styles.ListEventsTtitle().Render("List Events")
 
 	body := m.buildBody()
 	lines := strings.Split(body, "\n")

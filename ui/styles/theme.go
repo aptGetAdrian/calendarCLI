@@ -25,10 +25,25 @@ const (
 	ColorSecondaryFg     = "#3b7a57" // Soft forest
 	ColorSecondaryBorder = "#b8d9b8" // Light moss
 
-	// Commodore 64 (blue) for third menu if needed
-	ColorTertiaryBg     = "#00002a" // Deep blue-black
-	ColorTertiaryFg     = "#5fafff" // Light blue
-	ColorTertiaryBorder = "#1f3f7f" // Navy blue
+	// List Events - cool periwinkle blue
+	ColorListEventsBg     = "#e6eeff"
+	ColorListEventsFg     = "#2a55b0"
+	ColorListEventsBorder = "#a0b8e8"
+
+	// Create Event - warm violet / plum
+	ColorCreateEventBg     = "#f2eaff"
+	ColorCreateEventFg     = "#6b28b8"
+	ColorCreateEventBorder = "#c8a8e8"
+
+	// Add Birthday - blush rose
+	ColorBirthdayBg     = "#fff0f2"
+	ColorBirthdayFg     = "#b83060"
+	ColorBirthdayBorder = "#e8aac0"
+
+	// Todo - seafoam teal
+	ColorTodoBg     = "#e2f5f4"
+	ColorTodoFg     = "#1d7a78"
+	ColorTodoBorder = "#8ecece"
 
 	// Pure terminal black/white
 	ColorBlack = "#000000"
@@ -64,6 +79,42 @@ func SecondaryMenuTtitle() lipgloss.Style {
 		Bold(true).
 		Foreground(lipgloss.Color(ColorSecondaryFg)).
 		Background(lipgloss.Color(ColorSecondaryBg))
+}
+
+func ListEventsTtitle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(ColorListEventsBorder)).
+		Padding(0, 2).Bold(true).
+		Foreground(lipgloss.Color(ColorListEventsFg)).
+		Background(lipgloss.Color(ColorListEventsBg))
+}
+
+func CreateEventTtitle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(ColorCreateEventBorder)).
+		Padding(0, 2).Bold(true).
+		Foreground(lipgloss.Color(ColorCreateEventFg)).
+		Background(lipgloss.Color(ColorCreateEventBg))
+}
+
+func AddBirthdayTtitle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(ColorBirthdayBorder)).
+		Padding(0, 2).Bold(true).
+		Foreground(lipgloss.Color(ColorBirthdayFg)).
+		Background(lipgloss.Color(ColorBirthdayBg))
+}
+
+func TodoTtitle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(ColorTodoBorder)).
+		Padding(0, 2).Bold(true).
+		Foreground(lipgloss.Color(ColorTodoFg)).
+		Background(lipgloss.Color(ColorTodoBg))
 }
 
 var (

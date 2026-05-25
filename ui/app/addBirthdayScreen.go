@@ -194,7 +194,7 @@ func (m *addBirthdayScreenModel) View() string {
 	muted := lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorBorder))
 	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(styles.ColorError))
 
-	title := styles.SecondaryMenuTtitle().Render("Add Birthday")
+	title := styles.AddBirthdayTtitle().Render("Add Birthday")
 
 	monthHint := ""
 	if n, err := strconv.Atoi(strings.TrimSpace(m.monthInput.Value())); err == nil && n >= 1 && n <= 12 {
