@@ -21,6 +21,11 @@
       "action": "TODO_LIST"
     },
     {
+      "title": "Notebook",
+      "description": "Store and browse your programming and theory notes.",
+      "action": "NOTEBOOK"
+    },
+    {
       "title": "Exit",
       "description": "Close the application.",
       "action": "EXIT_APP"

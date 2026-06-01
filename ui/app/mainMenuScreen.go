@@ -61,6 +61,8 @@ func (m *mainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, func() tea.Msg { return NavigateTo{Screen: ui.AddBirthdayScreen} }
 			case "TODO_LIST":
 				return m, func() tea.Msg { return NavigateTo{Screen: ui.TodoScreen} }
+			case "NOTEBOOK":
+				return m, func() tea.Msg { return NavigateTo{Screen: ui.NotebookScreen} }
 			}
 			return m, nil
 

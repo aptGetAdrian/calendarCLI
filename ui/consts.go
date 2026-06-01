@@ -23,4 +23,5 @@ const (
 	CreateEventScreen
 	AddBirthdayScreen
 	TodoScreen
+	NotebookScreen
 )

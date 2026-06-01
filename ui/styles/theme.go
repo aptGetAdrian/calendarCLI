@@ -45,6 +45,14 @@ const (
 	ColorTodoFg     = "#1d7a78"
 	ColorTodoBorder = "#8ecece"
 
+	// Notebook - aged parchment / warm gold
+	ColorNotebookBg           = "#fef9ec"
+	ColorNotebookFg           = "#7a5c00"
+	ColorNotebookBorder       = "#dbc87a"
+	ColorNotebookActiveTab    = "#dbc87a"
+	ColorNotebookActiveTabFg  = "#3d2d00"
+	ColorNotebookInactiveTab  = "7" // same as ColorBorder
+
 	// Pure terminal black/white
 	ColorBlack = "#000000"
 	ColorWhite = "#ffffff"
@@ -106,6 +114,15 @@ func AddBirthdayTtitle() lipgloss.Style {
 		Padding(0, 2).Bold(true).
 		Foreground(lipgloss.Color(ColorBirthdayFg)).
 		Background(lipgloss.Color(ColorBirthdayBg))
+}
+
+func NotebookTtitle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(ColorNotebookBorder)).
+		Padding(0, 2).Bold(true).
+		Foreground(lipgloss.Color(ColorNotebookFg)).
+		Background(lipgloss.Color(ColorNotebookBg))
 }
 
 func TodoTtitle() lipgloss.Style {

@@ -5,16 +5,6 @@
     "description": "eba"
   },
   {
-    "id": "1778279527579900187",
-    "title": "dark vessels",
-    "description": "- cross reference improvement\n- home page\n\nas for the vessels that are over end of life or something similar, this is what i got:\nThis is a real concept — they're called substandard vessels. Ships must pass class society surveys (annual + special every 5 years) and port state control inspections.\n  Vessels operating with expired surveys or repeated detentions are a genuine risk.\n\n  The problem: AIS data doesn't include build year, survey dates, or inspection history. To know if a vessel is overdue for maintenance you need an external registry.\n\n  There are two realistic options:\n\n  Option A — Equasis (free, EU-run): official maritime database with PSC inspection history, detentions, and class society records for every IMO-numbered vessel. No public\n  API though — it's a web portal requiring a free account. We'd have to scrape it or use their SFTP bulk export.\n\n  Option B — Simulate for now, note the real source: implement the UI and detection logic with a placeholder that marks vessels as \"at-risk\" based on proxy signals we do\n  have from AIS — flags of convenience (specific MMSI country prefixes), missing IMO on commercial vessels, vessels with multiple simultaneous anomaly flags. This gives a\n  working demo that could be swapped for real Equasis data later.\n\n  For a student project, Option B is the honest move — you'd show the feature with a disclaimer that production would use Equasis, which is exactly what real maritime\n  monitoring systems do when they can't afford IHS Markit.\n\n  Want me to implement Option B with a clear \"data source: simulated / would use Equasis\" label in the UI?"
-  },
-  {
-    "id": "1778279592393886691",
-    "title": "marketing",
-    "description": "- try to make animations\n- thin the text\n- try prezi for the animations\n- send to oliver"
-  },
-  {
     "id": "1778279612833368836",
     "title": "figure out how to add to-do list to phone",
     "description": ""
@@ -27,6 +17,6 @@
   {
     "id": "1778415022809721609",
     "title": "to-do today",
-    "description": "- study machine learning\n- add birthdays to birthday calendar"
+    "description": "- add birthdays to birthday calendar\n\n- study for interview"
   }
 ]

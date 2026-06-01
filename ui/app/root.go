@@ -19,6 +19,7 @@ const (
 	screenCreateEvent ui.Screen = ui.CreateEventScreen
 	screenAddBirthday ui.Screen = ui.AddBirthdayScreen
 	screenTodo        ui.Screen = ui.TodoScreen
+	screenNotebook    ui.Screen = ui.NotebookScreen
 )
 
 type AppState struct {
