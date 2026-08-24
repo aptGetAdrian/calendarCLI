@@ -18,7 +18,7 @@ type mainMenuModel struct {
 func newMainMenuModel(state AppState, width, height int, logger *logger.Logger) *mainMenuModel {
 	items, err := ui.LoadMenuItems("main_menu_items")
 	if err != nil {
-		logger.Fatalf("Error loading menu items:", err)
+		logger.Fatalf("Error loading menu items: %v", err)
 	}
 
 	l := BuildList("Main menu", items, ui.MainMenu, width, height)

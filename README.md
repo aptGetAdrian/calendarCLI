@@ -82,9 +82,11 @@ On first run the app prints an auth URL. Open it in a browser, approve access, a
 | List events | `esc` | Back to main menu |
 | Create event | `tab` / `enter` | Next field |
 | Create event | `shift+tab` | Previous field |
-| Create event | `← →` | Move day (calendar picker) |
-| Create event | `↑ ↓` | Move week / change hour or minute |
+| Create event | `← →` | Move between parts of a date/time · cycle calendars · pick a duration |
+| Create event | `↑ ↓` | Change the part under the cursor |
 | Create event | `[ ]` | Previous / next month |
+| Create event | `t` | Jump the focused date to today |
+| Create event | `ctrl+s` | Save from any field |
 | Create event | `esc` | Cancel |
 
 ---

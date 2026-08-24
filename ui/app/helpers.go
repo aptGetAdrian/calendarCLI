@@ -6,6 +6,7 @@ import (
 	"calendarCli/ui"
 	"calendarCli/ui/styles"
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -137,4 +138,32 @@ func (m *RootModel) handleNavigation(msg NavigateTo, logger *logger.Logger) (tea
 		return m, child.Init()
 	}
 	return m, nil
+}
+
+// ─── shared render helpers ────────────────────────────────────────────────────
+
+// clipAndPad slices lines[offset:offset+avail] and pads with blank lines so the
+// result is always exactly avail lines — this keeps the root model's status bar
+// pinned to the bottom no matter how tall the screen's content is.
+func clipAndPad(lines []string, offset, avail int) string {
+	end := offset + avail
+	if end > len(lines) {
+		end = len(lines)
+	}
+	if offset > end {
+		offset = end
+	}
+	out := make([]string, avail) // zero value is the blank pad line
+	copy(out, lines[offset:end])
+	return strings.Join(out, "\n")
+}
+
+// centerIn pads s with spaces so it sits centred in width columns.
+func centerIn(s string, width int) string {
+	n := lipgloss.Width(s)
+	if n >= width {
+		return s
+	}
+	l := (width - n) / 2
+	return strings.Repeat(" ", l) + s + strings.Repeat(" ", width-n-l)
 }
