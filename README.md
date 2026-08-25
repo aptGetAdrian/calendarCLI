@@ -1,4 +1,4 @@
-# calendarCLI
+# calendarTUI
 
 A terminal UI for Google Calendar — browse your week, view events, and create new ones without leaving the terminal.
 
